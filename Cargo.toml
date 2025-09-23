@@ -1,2 +1,17 @@
-[workspace]
-members = []
+[package]
+name = "nymph"
+version = "0.1.0"
+authors = ["Dante Helmore <frostu8@protonmail.com>"]
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+dotenv = "0.15"
+tokio = { version = "1.47", features = ["rt", "rt-multi-thread", "macros"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+twilight-cache-inmemory = "0.16"
+twilight-gateway = "0.16"
+twilight-http = "0.16"
+twilight-model = "0.16"
+twilight-util = { version = "0.16", features = ["builder"] }
