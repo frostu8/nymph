@@ -1,15 +1,15 @@
 -- Create the card document database
-CREATE TABLE Card (
-    Id SERIAL PRIMARY KEY,
+CREATE TABLE card (
+    id SERIAL PRIMARY KEY,
     -- card guild location
-    GuildId BIGINT NOT NULL,
+    guild_id BIGINT NOT NULL,
     -- full card name
-    Name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
     -- card content
-    Content TEXT NOT NULL,
+    content TEXT NOT NULL,
     -- timestamps
-    InsertedAt TIMESTAMP NOT NULL,
-    UpdatedAt TIMESTAMP NOT NULL,
+    inserted_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
 
-    UNIQUE (GuildId, Name)
+    UNIQUE (guild_id, name)
 )

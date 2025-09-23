@@ -7,7 +7,7 @@ use twilight_model::id::{Id, marker::GuildMarker};
 
 /// A single card.
 #[derive(Clone, Debug, FromRow)]
-#[sqlx(rename_all = "PascalCase")]
+#[sqlx(rename_all = "lowercase")]
 pub struct Card {
     id: i32,
     guild_id: i64,
@@ -52,14 +52,47 @@ impl Card {
     }
 }
 
-/// Gets a list of cards by name, returning the names of each card.
-pub async fn search<'e, E>(db: E, query: &str) -> Result<Vec<String>, Error>
+/// Fetches a single card by name.
+pub async fn get<'e, E>(
+    db: E,
+    guild_id: impl Into<u64>,
+    name: impl AsRef<str>,
+) -> Result<Option<Card>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
-    sqlx::query_as::<_, (String,)>("SELECT Name FROM Card WHERE Name LIKE CONCAT('%', $1, '%')")
-        .bind(query)
-        .fetch_all(db)
-        .await
-        .map(|result| result.into_iter().map(|(s,)| s).collect())
+    sqlx::query_as(
+        r#"
+        SELECT
+            id, guild_id, name, content, inserted_at, updated_at
+        FROM
+            card
+        WHERE
+            guild_id = $1 AND
+            name = $2
+        "#,
+    )
+    .bind(guild_id.into() as i64)
+    .bind(name.as_ref())
+    .fetch_optional(db)
+    .await
+}
+
+/// Gets a list of cards by name, returning the names of each card.
+pub async fn search<'e, E>(
+    db: E,
+    guild_id: impl Into<u64>,
+    query: impl AsRef<str>,
+) -> Result<Vec<String>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as::<_, (String,)>(
+        "SELECT name FROM card WHERE guild_id = $1 AND name LIKE CONCAT('%', $2, '%')",
+    )
+    .bind(guild_id.into() as i64)
+    .bind(query.as_ref())
+    .fetch_all(db)
+    .await
+    .map(|result| result.into_iter().map(|(s,)| s).collect())
 }
