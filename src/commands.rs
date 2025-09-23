@@ -14,6 +14,8 @@ use twilight_model::{
 };
 use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 
+use sqlx::PgPool;
+
 /// Command context.
 ///
 /// Drills some useful things to the command endpoint.
@@ -21,6 +23,7 @@ use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 pub struct Context {
     /// HTTP Client used to respond to interactions.
     pub client: Arc<Client>,
+    pub db: PgPool,
     pub application_id: Id<ApplicationMarker>,
 }
 

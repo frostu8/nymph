@@ -1,6 +1,8 @@
 use std::env;
 use std::sync::Arc;
 
+use nymph::{commands::Context, dispatch};
+use sqlx::PgPool;
 use twilight_gateway::{
     ConfigBuilder, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt as _,
 };
@@ -11,6 +13,11 @@ async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     tracing_subscriber::fmt::init();
 
+    // setup database
+    let database_url = env::var("DATABASE_URL")?;
+    let pool = PgPool::connect(&database_url).await?;
+
+    // setup discord connection
     let token = env::var("DISCORD_TOKEN")?;
     let intents = Intents::empty();
 
@@ -40,7 +47,16 @@ async fn main() -> anyhow::Result<()> {
                     .set_global_commands(&nymph::commands::commands())
                     .await?;
             }
-            Event::InteractionCreate(interaction) => {}
+            Event::InteractionCreate(interaction) => {
+                // setup command context
+                let cx = Context {
+                    client: client.clone(),
+                    db: pool.clone(),
+                    application_id: application.id,
+                };
+
+                tokio::spawn(dispatch::interaction(cx, interaction));
+            }
             _ => (),
         }
     }

@@ -1,0 +1,92 @@
+//! Interaction dispatch.
+
+use tracing::instrument;
+use twilight_model::{
+    application::{
+        command::{CommandOptionChoice, CommandOptionChoiceValue, CommandOptionType},
+        interaction::{
+            InteractionData, InteractionType,
+            application_command::{CommandData, CommandOptionValue},
+        },
+    },
+    gateway::payload::incoming::InteractionCreate,
+    http::interaction::{InteractionResponse, InteractionResponseType},
+};
+use twilight_util::builder::InteractionResponseDataBuilder;
+
+use crate::commands::Context;
+use crate::models::card;
+
+/// Handles an interaction.
+#[instrument]
+pub async fn interaction(cx: Context, mut interaction: Box<InteractionCreate>) {
+    match interaction.kind {
+        InteractionType::ApplicationCommandAutocomplete => {
+            let data = interaction.0.data.take();
+            let Some(InteractionData::ApplicationCommand(data)) = data else {
+                tracing::error!("failed to get interaction payload");
+                return;
+            };
+
+            if let Err(err) = autocomplete(cx, interaction, data).await {
+                tracing::error!("{}", err);
+            }
+        }
+        // ignore other payloads
+        _ => (),
+    }
+}
+
+async fn autocomplete(
+    cx: Context,
+    interaction: Box<InteractionCreate>,
+    data: Box<CommandData>,
+) -> anyhow::Result<()> {
+    match data.name.as_str() {
+        // run show autocomplete
+        "show" => {
+            let name = data
+                .options
+                .iter()
+                .find(|option| option.name == "name")
+                .and_then(|option| match option.value {
+                    CommandOptionValue::Focused(ref value, CommandOptionType::String) => {
+                        Some(value)
+                    }
+                    _ => None,
+                });
+
+            let Some(name) = name else {
+                // invalid command payload
+                anyhow::bail!("invalid command payload");
+            };
+
+            // get cards with name
+            let cards = card::search(&cx.db, &name).await?;
+            let choices = cards.into_iter().map(|name| CommandOptionChoice {
+                name_localizations: None,
+                value: CommandOptionChoiceValue::String(name.clone()),
+                name,
+            });
+
+            cx.client
+                .interaction(cx.application_id)
+                .create_response(
+                    interaction.id,
+                    &interaction.token,
+                    &InteractionResponse {
+                        kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
+                        data: Some(
+                            InteractionResponseDataBuilder::new()
+                                .choices(choices)
+                                .build(),
+                        ),
+                    },
+                )
+                .await?;
+        }
+        _ => (),
+    }
+
+    Ok(())
+}
