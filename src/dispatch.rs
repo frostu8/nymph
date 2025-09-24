@@ -2,6 +2,7 @@
 
 use std::iter;
 
+use textdistance::{Algorithm, DamerauLevenshtein};
 use tracing::instrument;
 use twilight_model::{
     application::{
@@ -11,6 +12,7 @@ use twilight_model::{
             application_command::{CommandData, CommandOptionValue},
         },
     },
+    channel::message::MessageFlags,
     gateway::payload::incoming::InteractionCreate,
     http::interaction::{InteractionResponse, InteractionResponseType},
 };
@@ -60,7 +62,7 @@ async fn slash_command(
     };
 
     match data.name.as_str() {
-        "show" => {
+        "show" | "s" => {
             let name = data
                 .options
                 .iter()
@@ -77,7 +79,7 @@ async fn slash_command(
 
             match card::get(&cx.db, guild_id, name).await? {
                 Some(card) => {
-                    let embed = display_card(&card);
+                    let embed = display_card(&cx.config, &card);
                     cx.client
                         .interaction(cx.application_id)
                         .create_response(
@@ -87,6 +89,7 @@ async fn slash_command(
                                 kind: InteractionResponseType::ChannelMessageWithSource,
                                 data: Some(
                                     InteractionResponseDataBuilder::new()
+                                        .flags(MessageFlags::EPHEMERAL)
                                         .embeds(iter::once(embed))
                                         .build(),
                                 ),
@@ -108,6 +111,7 @@ async fn slash_command(
                                 kind: InteractionResponseType::ChannelMessageWithSource,
                                 data: Some(
                                     InteractionResponseDataBuilder::new()
+                                        .flags(MessageFlags::EPHEMERAL)
                                         .content(message)
                                         .build(),
                                 ),
@@ -134,7 +138,7 @@ async fn autocomplete(
 
     match data.name.as_str() {
         // run show autocomplete
-        "show" => {
+        "show" | "s" => {
             let name = data
                 .options
                 .iter()
@@ -155,7 +159,17 @@ async fn autocomplete(
             let name = name.to_ascii_uppercase();
 
             // get cards with name
-            let cards = card::search(&cx.db, guild_id, &name).await?;
+            let mut cards = card::search(&cx.db, guild_id, &name).await?;
+
+            // sort by lexicographic score
+            let textdistance = DamerauLevenshtein::default();
+            cards.sort_unstable_by(|a, b| {
+                let a = textdistance.for_str(a, &name).val();
+                let b = textdistance.for_str(b, &name).val();
+                a.cmp(&b)
+            });
+
+            // map into choices
             let choices = cards.into_iter().map(|name| CommandOptionChoice {
                 name_localizations: None,
                 value: CommandOptionChoiceValue::String(name.clone()),

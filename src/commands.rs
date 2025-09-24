@@ -16,11 +16,14 @@ use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 
 use sqlx::PgPool;
 
+use crate::config::Config;
+
 /// Command context.
 ///
 /// Drills some useful things to the command endpoint.
 #[derive(Clone, Debug)]
 pub struct Context {
+    pub config: Arc<Config>,
     /// HTTP Client used to respond to interactions.
     pub client: Arc<Client>,
     pub db: PgPool,
@@ -36,18 +39,33 @@ impl Deref for Context {
 }
 
 /// Returns a list of commands the bot offers.
-pub fn commands() -> [Command; 1] {
-    [CommandBuilder::new(
-        "show",
-        "Displays full information about a card publicly",
-        CommandType::ChatInput,
-    )
-    .integration_types([ApplicationIntegrationType::GuildInstall])
-    .contexts([InteractionContextType::Guild])
-    .option(
-        StringBuilder::new("name", "The name of the card")
-            .autocomplete(true)
-            .required(true),
-    )
-    .build()]
+pub fn commands() -> [Command; 2] {
+    [
+        CommandBuilder::new(
+            "show",
+            "Displays full information about a card privately",
+            CommandType::ChatInput,
+        )
+        .integration_types([ApplicationIntegrationType::GuildInstall])
+        .contexts([InteractionContextType::Guild])
+        .option(
+            StringBuilder::new("name", "The name of the card")
+                .autocomplete(true)
+                .required(true),
+        )
+        .build(),
+        CommandBuilder::new(
+            "s",
+            "Displays full information about a card privately",
+            CommandType::ChatInput,
+        )
+        .integration_types([ApplicationIntegrationType::GuildInstall])
+        .contexts([InteractionContextType::Guild])
+        .option(
+            StringBuilder::new("name", "The name of the card")
+                .autocomplete(true)
+                .required(true),
+        )
+        .build(),
+    ]
 }

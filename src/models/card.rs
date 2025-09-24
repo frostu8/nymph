@@ -12,6 +12,7 @@ pub struct Card {
     id: i32,
     guild_id: i64,
     name: String,
+    category_name: Option<String>,
     content: String,
     inserted_at: NaiveDateTime,
     updated_at: NaiveDateTime,
@@ -34,6 +35,11 @@ impl Card {
     /// The name of the card.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The name of the set the card belongs to.
+    pub fn category_name(&self) -> Option<&str> {
+        self.category_name.as_deref()
     }
 
     /// The description of the card.
@@ -64,7 +70,7 @@ where
     sqlx::query_as(
         r#"
         SELECT
-            id, guild_id, name, content, inserted_at, updated_at
+            id, guild_id, name, category_name, content, inserted_at, updated_at
         FROM
             card
         WHERE

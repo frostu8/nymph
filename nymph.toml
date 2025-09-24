@@ -1,0 +1,15 @@
+[category.positive]
+suffix = "<:PositiveSet:1420275724127830056>"
+color = "#33f574"
+
+[category.neutral]
+suffix = "<:NeutralSet:1420275721733144666>"
+color = "#dcf5f3"
+
+[category.negative]
+suffix = "<:NegativeSet:1420275719883194420>"
+color = "#f22a13"
+
+[category.integral]
+suffix = "<:IntegralSet:1420275718570381433>"
+color = "#37a8e6"
