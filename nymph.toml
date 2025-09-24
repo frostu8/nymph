@@ -1,3 +1,29 @@
+[accent]
+not_found = [
+    """"I've never heard of that one before." The Archivist responds with \
+    curious eyes. "But it sounds like it might be an interesting addition."""",
+    """The Archivist simply responds with a gentle shake of her head at your \
+    request.""",
+    """"My superior has dedicated his entire life to the search for absolute \
+    knowledge, so I find it unlikely we don't know of that." The Archivist \
+    replies with unsure, quaking words.""",
+    """The Archivist idly folds a paper crane, her attention divided on her \
+    task as she balances her wooden chair on two legs. "It probably doesn't \
+    exist."""",
+    """"Maybe you should ask Remy." The Archivist says meekly, her gaze \
+    averted. "I've been told 56 is a bit young to be working here..."""",
+    """"I don't know what you could be referring to." The Archivist adjusts a \
+    golden ribbon on her crimson hair, her gaze drifting upwards in a weak \
+    attempt to visualize herself. "Do you think this looks cute?"""",
+    """The Archivist shakes her head in an erratic rhythm, her face \
+    permanently frozen in a state of shock. "I-I-I don't k-know... I-I'm \
+    s-s-sorry! I-I-I was on th-th-thought f-furnace d-d-duty today..."""",
+    """The Archivist gnaws on a pen. "My boss told me that I can't say we \
+    don't know it anymore." She replied, though the pen in her mouth didn't \
+    make it any easier to understand. "So we have determined you are \
+    delusional, or have had memories implanted."""",
+]
+
 [category.positive]
 suffix = "<:PositiveSet:1420275724127830056>"
 color = "#33f574"

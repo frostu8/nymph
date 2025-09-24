@@ -6,6 +6,7 @@ use figment::{
     Figment,
     providers::{Env, Format as _, Toml},
 };
+use rand::seq::IndexedRandom;
 use serde::{Deserialize, Deserializer, de::Error as _};
 
 /// The main configuration struct.
@@ -15,6 +16,8 @@ pub struct Config {
     pub discord_token: String,
     /// The database url the bot shall connect to.
     pub database_url: String,
+    /// Accent text configuration.
+    pub accent: AccentTextConfig,
     /// Contains set information.
     #[serde(default)]
     pub category: HashMap<String, CategoryConfig>,
@@ -28,6 +31,20 @@ impl Config {
             .merge(Env::prefixed("NYMPH_"))
             .merge(Env::raw().only(&["DISCORD_TOKEN", "DATABASE_URL"]))
             .extract()
+    }
+}
+
+/// Configuration for accent text that appears in certain states or actions.
+#[derive(Deserialize, Debug, Clone)]
+pub struct AccentTextConfig {
+    pub not_found: Vec<String>,
+}
+
+impl AccentTextConfig {
+    /// Selects a not found text.
+    pub fn select_not_found(&self) -> &str {
+        let mut rng = rand::rng();
+        self.not_found.choose(&mut rng).expect("at least one line")
     }
 }
 

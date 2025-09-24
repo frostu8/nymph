@@ -18,8 +18,7 @@ use twilight_model::{
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-use crate::{accent::roll_not_found, models::card};
-use crate::{card::display_card, commands::Context};
+use crate::{card::display_card, commands::Context, models::card};
 
 /// Handles an interaction.
 #[instrument(skip(cx))]
@@ -99,7 +98,7 @@ async fn slash_command(
                 }
                 None => {
                     // Get a new not found message!
-                    let accent = roll_not_found();
+                    let accent = cx.config.accent.select_not_found();
                     let message = format!("-# {}\nThe card `{}` does not exist.", accent, name);
 
                     cx.client
