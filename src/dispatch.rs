@@ -2,7 +2,6 @@
 
 use std::iter;
 
-use textdistance::{Algorithm, DamerauLevenshtein};
 use tracing::instrument;
 use twilight_model::{
     application::{
@@ -18,7 +17,11 @@ use twilight_model::{
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-use crate::{card::display_card, commands::Context, models::card};
+use crate::{
+    card::{display_card, sort_results},
+    commands::Context,
+    models::card,
+};
 
 /// Handles an interaction.
 #[instrument(skip(cx))]
@@ -158,15 +161,8 @@ async fn autocomplete(
             let name = name.to_ascii_uppercase();
 
             // get cards with name
-            let mut cards = card::search(&cx.db, guild_id, &name).await?;
-
-            // sort by lexicographic score
-            let textdistance = DamerauLevenshtein::default();
-            cards.sort_unstable_by(|a, b| {
-                let a = textdistance.for_str(a, &name).val();
-                let b = textdistance.for_str(b, &name).val();
-                a.cmp(&b)
-            });
+            let cards = card::search(&cx.db, guild_id, &name).await?;
+            let cards = sort_results(cards, &name, 8);
 
             // map into choices
             let choices = cards.into_iter().map(|name| CommandOptionChoice {
