@@ -1,7 +1,5 @@
 //! Interaction dispatch.
 
-use std::iter;
-
 use tracing::instrument;
 use twilight_model::{
     application::{
@@ -11,14 +9,13 @@ use twilight_model::{
             application_command::{CommandData, CommandOptionValue},
         },
     },
-    channel::message::MessageFlags,
     gateway::payload::incoming::InteractionCreate,
     http::interaction::{InteractionResponse, InteractionResponseType},
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    card::{display_card, sort_results},
+    card::{show_card, sort_results},
     commands::Context,
     models::card,
 };
@@ -59,10 +56,6 @@ async fn slash_command(
     interaction: Box<InteractionCreate>,
     data: Box<CommandData>,
 ) -> anyhow::Result<()> {
-    let Some(guild_id) = interaction.guild_id else {
-        anyhow::bail!("missing guild id in interaction");
-    };
-
     match data.name.as_str() {
         "show" | "s" => {
             let name = data
@@ -78,51 +71,8 @@ async fn slash_command(
                 // invalid command payload
                 anyhow::bail!("invalid command payload");
             };
-            let name = name.to_uppercase();
 
-            match card::get(&cx.db, guild_id, &name).await? {
-                Some(card) => {
-                    let embed = display_card(&cx.config, &card);
-                    cx.client
-                        .interaction(cx.application_id)
-                        .create_response(
-                            interaction.id,
-                            &interaction.token,
-                            &InteractionResponse {
-                                kind: InteractionResponseType::ChannelMessageWithSource,
-                                data: Some(
-                                    InteractionResponseDataBuilder::new()
-                                        .flags(MessageFlags::EPHEMERAL)
-                                        .embeds(iter::once(embed))
-                                        .build(),
-                                ),
-                            },
-                        )
-                        .await?;
-                }
-                None => {
-                    // Get a new not found message!
-                    let accent = cx.config.accent.select_not_found();
-                    let message = format!("-# {}\nThe card `{}` does not exist.", accent, name);
-
-                    cx.client
-                        .interaction(cx.application_id)
-                        .create_response(
-                            interaction.id,
-                            &interaction.token,
-                            &InteractionResponse {
-                                kind: InteractionResponseType::ChannelMessageWithSource,
-                                data: Some(
-                                    InteractionResponseDataBuilder::new()
-                                        .flags(MessageFlags::EPHEMERAL)
-                                        .content(message)
-                                        .build(),
-                                ),
-                            },
-                        )
-                        .await?;
-                }
-            }
+            show_card(&cx, &interaction, name).await?;
         }
         _ => (),
     }

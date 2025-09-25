@@ -1,11 +1,83 @@
 //! Card functions.
 
+use std::iter;
+
 use chrono::Local;
 use textdistance::{Algorithm, Levenshtein};
-use twilight_model::{channel::message::Embed, util::Timestamp};
-use twilight_util::builder::embed::EmbedBuilder;
+use twilight_model::{
+    application::interaction::Interaction,
+    channel::message::{Embed, MessageFlags},
+    http::interaction::{InteractionResponse, InteractionResponseType},
+    util::Timestamp,
+};
+use twilight_util::builder::{InteractionResponseDataBuilder, embed::EmbedBuilder};
 
-use crate::{config::Config, models::card::Card};
+use crate::{
+    commands::Context,
+    config::Config,
+    models::card::{self, Card},
+};
+
+/// Responds to an interaction with card information fetched by its `name`.
+///
+/// Does not do anything if the function returns an [`Err`].
+pub async fn show_card(
+    cx: &Context,
+    interaction: &Interaction,
+    name: impl AsRef<str>,
+) -> anyhow::Result<()> {
+    let Some(guild_id) = interaction.guild_id else {
+        anyhow::bail!("missing guild id in interaction");
+    };
+
+    let name = name.as_ref().to_uppercase();
+
+    match card::get(&cx.db, guild_id, &name).await? {
+        Some(card) => {
+            let embed = display_card(&cx.config, &card);
+            cx.client
+                .interaction(cx.application_id)
+                .create_response(
+                    interaction.id,
+                    &interaction.token,
+                    &InteractionResponse {
+                        kind: InteractionResponseType::ChannelMessageWithSource,
+                        data: Some(
+                            InteractionResponseDataBuilder::new()
+                                .flags(MessageFlags::EPHEMERAL)
+                                .embeds(iter::once(embed))
+                                .build(),
+                        ),
+                    },
+                )
+                .await?;
+        }
+        None => {
+            // Get a new not found message!
+            let accent = cx.config.accent.select_not_found();
+            let message = format!("-# {}\nThe card `{}` does not exist.", accent, name);
+
+            cx.client
+                .interaction(cx.application_id)
+                .create_response(
+                    interaction.id,
+                    &interaction.token,
+                    &InteractionResponse {
+                        kind: InteractionResponseType::ChannelMessageWithSource,
+                        data: Some(
+                            InteractionResponseDataBuilder::new()
+                                .flags(MessageFlags::EPHEMERAL)
+                                .content(message)
+                                .build(),
+                        ),
+                    },
+                )
+                .await?;
+        }
+    }
+
+    Ok(())
+}
 
 /// Sorts the results of a card search.
 pub fn sort_results(
