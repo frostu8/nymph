@@ -15,9 +15,13 @@ async fn main() -> anyhow::Result<()> {
     // load config
     let config = Arc::new(Config::load("nymph.toml")?);
 
+    tracing::info!("connecting to database...");
+
     // setup database
     let database_url = config.database_url.clone();
     let pool = PgPool::connect(&database_url).await?;
+
+    tracing::info!("database connection established");
 
     // setup discord connection
     //let token = env::var("DISCORD_TOKEN")?;
@@ -29,6 +33,12 @@ async fn main() -> anyhow::Result<()> {
     // setup client
     let client = Arc::new(Client::new(token));
     let application = client.current_user_application().await?.model().await?;
+
+    if let Some(owner) = application.owner {
+        tracing::info!("application id: {}, owner: {}", application.id, owner.name);
+    } else {
+        tracing::info!("application id: {}", application.id);
+    }
 
     let interaction = client.interaction(application.id);
 
@@ -44,7 +54,14 @@ async fn main() -> anyhow::Result<()> {
         tracing::debug!(?event, "received event");
 
         match event {
-            Event::Ready(_ready) => {
+            Event::Ready(ready) => {
+                tracing::info!(
+                    "serving bot as {}#{} in {} guilds",
+                    ready.user.name,
+                    ready.user.discriminator(),
+                    ready.guilds.len()
+                );
+
                 // create commands
                 interaction
                     .set_global_commands(&nymph::commands::commands())

@@ -78,8 +78,9 @@ async fn slash_command(
                 // invalid command payload
                 anyhow::bail!("invalid command payload");
             };
+            let name = name.to_uppercase();
 
-            match card::get(&cx.db, guild_id, name).await? {
+            match card::get(&cx.db, guild_id, &name).await? {
                 Some(card) => {
                     let embed = display_card(&cx.config, &card);
                     cx.client
