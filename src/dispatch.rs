@@ -19,7 +19,7 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    card::{show_card, show_not_found, sort_results},
+    card::{show_card, show_not_found, sort_results, update_card},
     commands::Context,
     models::card,
 };
@@ -176,14 +176,14 @@ async fn message_component(
     // buttons that show cards.
     let custom_id = data.custom_id.as_str();
 
-    if let Some(card_id) = custom_id.strip_prefix("show_card:") {
+    if let Some(card_id) = custom_id.strip_prefix("update_with_card:") {
         // this is a show card button!
         // parse the card id
         let card_id = card_id.parse::<i32>().context("malformed card id")?;
 
         // fetch card
         let card = card::get_by_id(&cx.db, card_id).await?;
-        show_card(&cx, &interaction, &card).await?;
+        update_card(&cx, &interaction, &card).await?;
     }
 
     Ok(())

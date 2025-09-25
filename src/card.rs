@@ -10,7 +10,7 @@ use twilight_model::{
         Component, Embed, MessageFlags,
         component::{ActionRow, Button, ButtonStyle},
     },
-    http::interaction::{InteractionResponse, InteractionResponseType},
+    http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     util::Timestamp,
 };
 use twilight_util::builder::{InteractionResponseDataBuilder, embed::EmbedBuilder};
@@ -24,6 +24,50 @@ use crate::{
 /// Responds to an interaction with card information.
 #[instrument(skip(cx, interaction))]
 pub async fn show_card(cx: &Context, interaction: &Interaction, card: &Card) -> anyhow::Result<()> {
+    let response = make_card_response(cx, interaction, card).await?;
+    cx.client
+        .interaction(cx.application_id)
+        .create_response(
+            interaction.id,
+            &interaction.token,
+            &InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(response),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// Responds to an interaction with card information by updating the original
+/// message of the interaction.
+#[instrument(skip(cx, interaction))]
+pub async fn update_card(
+    cx: &Context,
+    interaction: &Interaction,
+    card: &Card,
+) -> anyhow::Result<()> {
+    let response = make_card_response(cx, interaction, card).await?;
+    cx.client
+        .interaction(cx.application_id)
+        .create_response(
+            interaction.id,
+            &interaction.token,
+            &InteractionResponse {
+                kind: InteractionResponseType::UpdateMessage,
+                data: Some(response),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// Creates a response to an interaction requesting a card.
+async fn make_card_response(
+    cx: &Context,
+    interaction: &Interaction,
+    card: &Card,
+) -> anyhow::Result<InteractionResponseData> {
     let Some(guild_id) = interaction.guild_id else {
         anyhow::bail!("missing guild id in interaction");
     };
@@ -37,7 +81,7 @@ pub async fn show_card(cx: &Context, interaction: &Interaction, card: &Card) -> 
 
     if let Some(downgrade) = downgrade.as_ref() {
         components.push(Component::Button(Button {
-            custom_id: Some(format!("show_card:{}", downgrade.id())),
+            custom_id: Some(format!("update_with_card:{}", downgrade.id())),
             disabled: false,
             emoji: None,
             label: Some(String::from("--")),
@@ -49,7 +93,7 @@ pub async fn show_card(cx: &Context, interaction: &Interaction, card: &Card) -> 
 
     if let Some(upgrade) = upgrade.as_ref() {
         components.push(Component::Button(Button {
-            custom_id: Some(format!("show_card:{}", upgrade.id())),
+            custom_id: Some(format!("update_with_card:{}", upgrade.id())),
             disabled: false,
             emoji: None,
             label: Some(String::from("++")),
@@ -67,26 +111,13 @@ pub async fn show_card(cx: &Context, interaction: &Interaction, card: &Card) -> 
         .flags(MessageFlags::EPHEMERAL)
         .embeds(iter::once(embed));
 
-    let response_data = if components.len() > 0 {
-        response_data
+    if components.len() > 0 {
+        Ok(response_data
             .components(iter::once(Component::ActionRow(ActionRow { components })))
-            .build()
+            .build())
     } else {
-        response_data.build()
-    };
-
-    cx.client
-        .interaction(cx.application_id)
-        .create_response(
-            interaction.id,
-            &interaction.token,
-            &InteractionResponse {
-                kind: InteractionResponseType::ChannelMessageWithSource,
-                data: Some(response_data),
-            },
-        )
-        .await?;
-    Ok(())
+        Ok(response_data.build())
+    }
 }
 
 /// Responds to an interaction with a not found error message.
