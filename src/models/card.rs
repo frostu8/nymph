@@ -67,6 +67,8 @@ pub async fn get<'e, E>(
 where
     E: Executor<'e, Database = Postgres>,
 {
+    let guild_id = guild_id.into() as i64;
+
     sqlx::query_as(
         r#"
         SELECT
@@ -78,9 +80,29 @@ where
             name = $2
         "#,
     )
-    .bind(guild_id.into() as i64)
+    .bind(guild_id)
     .bind(name.as_ref())
     .fetch_optional(db)
+    .await
+}
+
+/// Fetches a single card by id.
+pub async fn get_by_id<'e, E>(db: E, id: i32) -> Result<Card, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
+        r#"
+        SELECT
+            id, guild_id, name, category_name, content, inserted_at, updated_at
+        FROM
+            card
+        WHERE
+            id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_one(db)
     .await
 }
 
@@ -93,12 +115,79 @@ pub async fn search<'e, E>(
 where
     E: Executor<'e, Database = Postgres>,
 {
+    let guild_id = guild_id.into() as i64;
+
     sqlx::query_as::<_, (String,)>(
         "SELECT name FROM card WHERE guild_id = $1 AND name LIKE CONCAT('%', $2, '%')",
     )
-    .bind(guild_id.into() as i64)
+    .bind(guild_id)
     .bind(query.as_ref())
     .fetch_all(db)
     .await
     .map(|result| result.into_iter().map(|(s,)| s).collect())
+}
+
+/// Fetches the upgrade of a card.
+pub async fn get_upgrade_of<'e, E>(
+    db: E,
+    guild_id: impl Into<u64>,
+    id: i32,
+) -> Result<Option<Card>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let guild_id = guild_id.into() as i64;
+
+    sqlx::query_as(
+        r#"
+        SELECT
+            id, guild_id, name, category_name, content, inserted_at, updated_at
+        FROM
+            card
+        WHERE
+            guild_id = $1 AND
+            previous_id = $2
+        "#,
+    )
+    .bind(guild_id)
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+/// Fetches the downgrade of a card.
+pub async fn get_downgrade_of<'e, E>(
+    db: E,
+    guild_id: impl Into<u64>,
+    id: i32,
+) -> Result<Option<Card>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let guild_id = guild_id.into() as i64;
+
+    sqlx::query_as(
+        r#"
+        SELECT
+            down.id,
+            down.guild_id,
+            down.name,
+            down.category_name,
+            down.content,
+            down.inserted_at,
+            down.updated_at
+        FROM
+            card AS down
+        JOIN
+            card AS up
+            ON down.id = up.previous_id
+        WHERE
+            down.guild_id = $1 AND
+            up.id = $2
+        "#,
+    )
+    .bind(guild_id)
+    .bind(id)
+    .fetch_optional(db)
+    .await
 }
