@@ -16,8 +16,29 @@ textdistance = "1.1.1"
 tokio = { version = "1.47", features = ["rt", "rt-multi-thread", "macros"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-twilight-cache-inmemory = "0.16"
-twilight-gateway = "0.16"
-twilight-http = "0.16"
-twilight-model = "0.16"
-twilight-util = { version = "0.16", features = ["builder"] }
+
+[dependencies.twilight-cache-inmemory]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+branch = "erk/uikit"
+
+[dependencies.twilight-gateway]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+branch = "erk/uikit"
+
+[dependencies.twilight-http]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+branch = "erk/uikit"
+
+[dependencies.twilight-model]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+branch = "erk/uikit"
+
+[dependencies.twilight-util]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+branch = "erk/uikit"
+features = ["builder"]

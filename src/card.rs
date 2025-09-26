@@ -7,17 +7,18 @@ use tracing::instrument;
 use twilight_model::{
     application::interaction::Interaction,
     channel::message::{
-        Component, Embed, MessageFlags,
+        Component, MessageFlags,
         component::{ActionRow, Button, ButtonStyle},
     },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
-    util::Timestamp,
 };
-use twilight_util::builder::{InteractionResponseDataBuilder, embed::EmbedBuilder};
+use twilight_util::builder::{
+    InteractionResponseDataBuilder,
+    message::{ContainerBuilder, TextDisplayBuilder},
+};
 
 use crate::{
     commands::Context,
-    config::Config,
     models::card::{self, Card},
 };
 
@@ -71,16 +72,24 @@ async fn make_card_response(
     let Some(guild_id) = interaction.guild_id else {
         anyhow::bail!("missing guild id in interaction");
     };
+    let category = card.category_name().and_then(|n| cx.config.category.get(n));
+    let color = category.and_then(|c| c.color);
 
     // find associated cards
     let downgrade = card::get_downgrade_of(&cx.db, guild_id, card.id()).await?;
     let upgrade = card::get_upgrade_of(&cx.db, guild_id, card.id()).await?;
 
-    // create component list
-    let mut components = Vec::with_capacity(2);
+    // create the card action row
+    let mut action_row = ActionRow {
+        id: None,
+        components: Vec::with_capacity(2),
+    };
 
+    // if we have found a downgrade or upgrade card, push the respective button
+    // to the end of the components list
     if let Some(downgrade) = downgrade.as_ref() {
-        components.push(Component::Button(Button {
+        action_row.components.push(Component::Button(Button {
+            id: None,
             custom_id: Some(format!("update_with_card:{}", downgrade.id())),
             disabled: false,
             emoji: None,
@@ -92,7 +101,8 @@ async fn make_card_response(
     }
 
     if let Some(upgrade) = upgrade.as_ref() {
-        components.push(Component::Button(Button {
+        action_row.components.push(Component::Button(Button {
+            id: None,
             custom_id: Some(format!("update_with_card:{}", upgrade.id())),
             disabled: false,
             emoji: None,
@@ -103,21 +113,35 @@ async fn make_card_response(
         }));
     }
 
-    // create embed for card
-    let embed = display_card(&cx.config, &card);
+    // append any category prefixes/suffixes to title
+    let formatted_title = match category {
+        Some(category) => match (category.prefix.as_ref(), category.suffix.as_ref()) {
+            (Some(prefix), Some(suffix)) => format!("# {} `{}` {}", prefix, card.name(), suffix),
+            (Some(prefix), None) => format!("# {} `{}`", prefix, card.name()),
+            (None, Some(suffix)) => format!("# `{}` {}", card.name(), suffix),
+            (None, None) => format!("# `{}`", card.name()),
+        },
+        None => format!("# `{}`", card.name()),
+    };
+
+    // build card body
+    let body = format!("{}\n{}", formatted_title, card.content());
+
+    //let timestamp =
+    //    Timestamp::from_micros(card.updated_at().and_utc().timestamp_micros()).expect("valid time");
+
+    let card_container = ContainerBuilder::new()
+        .accent_color(color)
+        .spoiler(false)
+        .component(TextDisplayBuilder::new(body).build())
+        .component(action_row)
+        .build();
 
     // create response
-    let response_data = InteractionResponseDataBuilder::new()
-        .flags(MessageFlags::EPHEMERAL)
-        .embeds(iter::once(embed));
-
-    if components.len() > 0 {
-        Ok(response_data
-            .components(iter::once(Component::ActionRow(ActionRow { components })))
-            .build())
-    } else {
-        Ok(response_data.build())
-    }
+    Ok(InteractionResponseDataBuilder::new()
+        .components(iter::once(Component::Container(card_container)))
+        .flags(MessageFlags::EPHEMERAL | MessageFlags::IS_COMPONENTS_V2)
+        .build())
 }
 
 /// Responds to an interaction with a not found error message.
@@ -187,34 +211,4 @@ pub fn sort_results(
 
     // combine and limit
     top.into_iter().chain(bottom).take(limit).collect()
-}
-
-/// Displays a card as an embed.
-pub fn display_card(config: &Config, card: &Card) -> Embed {
-    let category = card.category_name().and_then(|n| config.category.get(n));
-
-    // append any set prefixes/suffixes
-    let formatted_title = match category {
-        Some(category) => match (category.prefix.as_ref(), category.suffix.as_ref()) {
-            (Some(prefix), Some(suffix)) => format!("{} `{}` {}", prefix, card.name(), suffix),
-            (Some(prefix), None) => format!("{} `{}`", prefix, card.name()),
-            (None, Some(suffix)) => format!("`{}` {}", card.name(), suffix),
-            (None, None) => format!("`{}`", card.name()),
-        },
-        None => format!("`{}`", card.name()),
-    };
-
-    let timestamp =
-        Timestamp::from_micros(card.updated_at().and_utc().timestamp_micros()).expect("valid time");
-
-    let mut embed = EmbedBuilder::new()
-        .title(formatted_title)
-        .description(card.content())
-        .timestamp(timestamp);
-
-    if let Some(color) = category.and_then(|c| c.color) {
-        embed = embed.color(color);
-    }
-
-    embed.build()
 }
