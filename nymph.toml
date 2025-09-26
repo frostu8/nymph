@@ -23,6 +23,10 @@ not_found = [
     make it any easier to understand. "So we have determined you are \
     delusional, or have had memories implanted."""",
 ]
+unauthorized = [
+    """"Ah... I was told not to discuss matters of this kind with you." The \
+    Archivist replies meekly, but her words come sharp.""",
+]
 
 [category.positive]
 suffix = "<:PositiveSet:1420275724127830056>"

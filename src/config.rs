@@ -38,6 +38,7 @@ impl Config {
 #[derive(Deserialize, Debug, Clone)]
 pub struct AccentTextConfig {
     pub not_found: Vec<String>,
+    pub unauthorized: Vec<String>,
 }
 
 impl AccentTextConfig {
@@ -45,6 +46,15 @@ impl AccentTextConfig {
     pub fn select_not_found(&self) -> &str {
         let mut rng = rand::rng();
         self.not_found.choose(&mut rng).expect("at least one line")
+    }
+
+    /// Selects an accent text displayed when a user attempts to view a card
+    /// they are unable to access.
+    pub fn select_unauthorized(&self) -> &str {
+        let mut rng = rand::rng();
+        self.unauthorized
+            .choose(&mut rng)
+            .expect("at least one line")
     }
 }
 

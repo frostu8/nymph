@@ -19,7 +19,7 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    card::{show_card, show_not_found, sort_results, update_card},
+    card::{show_card, show_not_found, show_unauthorized, sort_results, update_card},
     commands::Context,
     models::card,
 };
@@ -74,6 +74,13 @@ async fn slash_command(
     let Some(guild_id) = interaction.guild_id else {
         anyhow::bail!("missing guild id in interaction");
     };
+    let Some(user_id) = interaction
+        .member
+        .as_ref()
+        .and_then(|m| m.user.as_ref().map(|u| u.id))
+    else {
+        anyhow::bail!("missing user id in interaciton");
+    };
 
     match data.name.as_str() {
         "show" | "s" => {
@@ -92,8 +99,11 @@ async fn slash_command(
             };
             let name = name.to_uppercase();
 
-            match card::get(&cx.db, guild_id, &name).await? {
-                Some(card) => show_card(&cx, &interaction, &card).await?,
+            match card::fetch(&cx.db, user_id, guild_id, &name).await? {
+                Some(card) if card.public() || card.owned => {
+                    show_card(&cx, &interaction, &card).await?;
+                }
+                Some(_card) => show_unauthorized(&cx, &interaction, &name).await?,
                 None => show_not_found(&cx, &interaction, &name).await?,
             }
         }

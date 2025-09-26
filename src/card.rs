@@ -25,7 +25,7 @@ use crate::{
 /// Responds to an interaction with card information.
 #[instrument(skip(cx, interaction))]
 pub async fn show_card(cx: &Context, interaction: &Interaction, card: &Card) -> anyhow::Result<()> {
-    let response = make_card_response(cx, interaction, card).await?;
+    let response = make_card(cx, interaction, card).await?;
     cx.client
         .interaction(cx.application_id)
         .create_response(
@@ -48,7 +48,7 @@ pub async fn update_card(
     interaction: &Interaction,
     card: &Card,
 ) -> anyhow::Result<()> {
-    let response = make_card_response(cx, interaction, card).await?;
+    let response = make_card(cx, interaction, card).await?;
     cx.client
         .interaction(cx.application_id)
         .create_response(
@@ -64,7 +64,7 @@ pub async fn update_card(
 }
 
 /// Creates a response to an interaction requesting a card.
-async fn make_card_response(
+async fn make_card(
     cx: &Context,
     interaction: &Interaction,
     card: &Card,
@@ -159,6 +159,39 @@ pub async fn show_not_found(
     let accent = cx.config.accent.select_not_found();
     let message = format!(
         "-# {}\nThe card `{}` does not exist.",
+        accent,
+        name.as_ref()
+    );
+
+    cx.client
+        .interaction(cx.application_id)
+        .create_response(
+            interaction.id,
+            &interaction.token,
+            &InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(
+                    InteractionResponseDataBuilder::new()
+                        .flags(MessageFlags::EPHEMERAL)
+                        .content(message)
+                        .build(),
+                ),
+            },
+        )
+        .await?;
+
+    Ok(())
+}
+
+/// Responds to an interaction with an unauthorized error message.
+pub async fn show_unauthorized(
+    cx: &Context,
+    interaction: &Interaction,
+    name: impl AsRef<str>,
+) -> anyhow::Result<()> {
+    let accent = cx.config.accent.select_unauthorized();
+    let message = format!(
+        "-# {}\nThe card `{}` is hidden to you.",
         accent,
         name.as_ref()
     );
