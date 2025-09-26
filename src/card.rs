@@ -130,12 +130,17 @@ async fn make_card_response(
     //let timestamp =
     //    Timestamp::from_micros(card.updated_at().and_utc().timestamp_micros()).expect("valid time");
 
-    let card_container = ContainerBuilder::new()
+    let mut card_container = ContainerBuilder::new()
         .accent_color(color)
         .spoiler(false)
         .component(TextDisplayBuilder::new(body).build())
-        .component(action_row)
         .build();
+    // add action row only if there are buttons to add
+    if action_row.components.len() > 0 {
+        card_container
+            .components
+            .push(Component::ActionRow(action_row));
+    }
 
     // create response
     Ok(InteractionResponseDataBuilder::new()
