@@ -177,7 +177,7 @@ async fn slash_command(
                                 kind: InteractionResponseType::ChannelMessageWithSource,
                                 data: Some(
                                     InteractionResponseDataBuilder::new()
-                                        .flags(MessageFlags::EPHEMERAL)
+                                        //.flags(MessageFlags::EPHEMERAL)
                                         .content(message)
                                         .allowed_mentions(AllowedMentions::default())
                                         .build(),
@@ -291,7 +291,7 @@ async fn slash_command(
                                 kind: InteractionResponseType::ChannelMessageWithSource,
                                 data: Some(
                                     InteractionResponseDataBuilder::new()
-                                        .flags(MessageFlags::EPHEMERAL)
+                                        //.flags(MessageFlags::EPHEMERAL)
                                         .content(message)
                                         .allowed_mentions(AllowedMentions::default())
                                         .build(),
