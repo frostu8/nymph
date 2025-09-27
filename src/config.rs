@@ -37,6 +37,9 @@ impl Config {
 /// Configuration for accent text that appears in certain states or actions.
 #[derive(Deserialize, Debug, Clone)]
 pub struct AccentTextConfig {
+    /// The accent text displayed in the bizarre case an admin attempts to
+    /// grant a card to the bot.
+    pub self_grant: String,
     pub not_found: Vec<String>,
     pub unauthorized: Vec<String>,
 }

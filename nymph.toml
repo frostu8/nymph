@@ -1,4 +1,7 @@
 [accent]
+self_grant = """"Haha, I appreciate the sentiment, but I know what I know. It \
+is ultimately a sense of self that separates humanity from creatures, and it \
+is intellect that separates elves from other races.""""
 not_found = [
     """"I've never heard of that one before." The Archivist responds with \
     curious eyes. "But it sounds like it might be an interesting addition."""",

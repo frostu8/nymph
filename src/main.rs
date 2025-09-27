@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use nymph::{commands::Context, config::Config, dispatch};
 use sqlx::PgPool;
+use twilight_cache_inmemory::{InMemoryCacheBuilder, ResourceType};
 use twilight_gateway::{
     ConfigBuilder, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt as _,
 };
@@ -30,6 +31,11 @@ async fn main() -> anyhow::Result<()> {
 
     let shard_config = ConfigBuilder::new(token.clone(), intents).build();
 
+    // setup cache
+    let cache_config = InMemoryCacheBuilder::new()
+        .resource_types(ResourceType::MEMBER | ResourceType::USER | ResourceType::USER_CURRENT);
+    let cache = Arc::new(cache_config.build());
+
     // setup client
     let client = Arc::new(Client::new(token));
     let application = client.current_user_application().await?.model().await?;
@@ -50,6 +56,8 @@ async fn main() -> anyhow::Result<()> {
 
             continue;
         };
+
+        cache.update(&event);
 
         tracing::debug!(?event, "received event");
 
@@ -72,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
                 let cx = Context {
                     config: config.clone(),
                     client: client.clone(),
+                    cache: cache.clone(),
                     db: pool.clone(),
                     application_id: application.id,
                 };

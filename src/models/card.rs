@@ -170,7 +170,48 @@ where
     .await
 }
 
-/// Gets a list of cards by name, returning the names of each card.
+/// Given a search query, gets a list of cards by name, returning the names of
+/// each card sorted by relevance.
+///
+/// Unlike [`search`], `search_visible` only includes entries that the provided
+/// user has access to (either by public status or if they own the card).
+pub async fn search_visible<'e, E>(
+    db: E,
+    user_id: impl Into<u64>,
+    guild_id: impl Into<u64>,
+    query: impl AsRef<str>,
+) -> Result<Vec<String>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let guild_id = guild_id.into() as i64;
+    let user_id = user_id.into() as i64;
+
+    sqlx::query_as::<_, (String,)>(
+        r#"
+        SELECT
+            c.name
+        FROM
+            card AS c
+        LEFT OUTER JOIN
+            ownership AS o
+            ON o.card_id = c.id AND o.owner_id = $2
+        WHERE
+            c.guild_id = $1 AND
+            (COALESCE(o.owned, FALSE) OR c.public) AND
+            c.name LIKE CONCAT('%', $3, '%')
+        "#,
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(query.as_ref())
+    .fetch_all(db)
+    .await
+    .map(|result| result.into_iter().map(|(s,)| s).collect())
+}
+
+/// Given a search query, gets a list of cards by name, returning the names of
+/// each card sorted by relevance.
 pub async fn search<'e, E>(
     db: E,
     guild_id: impl Into<u64>,
