@@ -68,15 +68,22 @@ async fn make_card(
     interaction: &Interaction,
     card: &Card,
 ) -> anyhow::Result<InteractionResponseData> {
-    let Some(guild_id) = interaction.guild_id else {
-        anyhow::bail!("missing guild id in interaction");
-    };
+    let guild_id = interaction
+        .guild_id
+        .ok_or_else(|| anyhow::Error::msg("missing guild id in interaction"))?;
+    let user_id = interaction
+        .member
+        .as_ref()
+        .and_then(|m| m.user.as_ref())
+        .map(|u| u.id)
+        .ok_or_else(|| anyhow::Error::msg("missing member in interaction"))?;
+
     let category = card.category_name().and_then(|n| cx.config.category.get(n));
     let color = category.and_then(|c| c.color);
 
     // find associated cards
-    let downgrade = card::get_downgrade_of(&cx.db, guild_id, card.id()).await?;
-    let upgrade = card::get_upgrade_of(&cx.db, guild_id, card.id()).await?;
+    let downgrade = card::fetch_downgrade_of(&cx.db, user_id, guild_id, card.id()).await?;
+    let upgrade = card::fetch_upgrade_of(&cx.db, user_id, guild_id, card.id()).await?;
 
     // create the card action row
     let mut action_row = ActionRow {
@@ -87,29 +94,33 @@ async fn make_card(
     // if we have found a downgrade or upgrade card, push the respective button
     // to the end of the components list
     if let Some(downgrade) = downgrade.as_ref() {
-        action_row.components.push(Component::Button(Button {
-            id: None,
-            custom_id: Some(format!("update_with_card:{}", downgrade.id())),
-            disabled: false,
-            emoji: None,
-            label: Some(String::from("--")),
-            style: ButtonStyle::Danger,
-            url: None,
-            sku_id: None,
-        }));
+        if downgrade.public() || downgrade.owned {
+            action_row.components.push(Component::Button(Button {
+                id: None,
+                custom_id: Some(format!("update_with_card:{}", downgrade.id())),
+                disabled: false,
+                emoji: None,
+                label: Some(String::from("--")),
+                style: ButtonStyle::Danger,
+                url: None,
+                sku_id: None,
+            }));
+        }
     }
 
     if let Some(upgrade) = upgrade.as_ref() {
-        action_row.components.push(Component::Button(Button {
-            id: None,
-            custom_id: Some(format!("update_with_card:{}", upgrade.id())),
-            disabled: false,
-            emoji: None,
-            label: Some(String::from("++")),
-            style: ButtonStyle::Success,
-            url: None,
-            sku_id: None,
-        }));
+        if upgrade.public() || upgrade.owned {
+            action_row.components.push(Component::Button(Button {
+                id: None,
+                custom_id: Some(format!("update_with_card:{}", upgrade.id())),
+                disabled: false,
+                emoji: None,
+                label: Some(String::from("++")),
+                style: ButtonStyle::Success,
+                url: None,
+                sku_id: None,
+            }));
+        }
     }
 
     // append any category prefixes/suffixes to title

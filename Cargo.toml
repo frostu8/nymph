@@ -21,25 +21,20 @@ tracing-subscriber = "0.3"
 [dependencies.twilight-cache-inmemory]
 version = "0.16"
 git = "https://github.com/twilight-rs/twilight.git"
-branch = "erk/uikit"
 
 [dependencies.twilight-gateway]
 version = "0.16"
 git = "https://github.com/twilight-rs/twilight.git"
-branch = "erk/uikit"
 
 [dependencies.twilight-http]
 version = "0.16"
 git = "https://github.com/twilight-rs/twilight.git"
-branch = "erk/uikit"
 
 [dependencies.twilight-model]
 version = "0.16"
 git = "https://github.com/twilight-rs/twilight.git"
-branch = "erk/uikit"
 
 [dependencies.twilight-util]
 version = "0.16"
 git = "https://github.com/twilight-rs/twilight.git"
-branch = "erk/uikit"
 features = ["builder"]

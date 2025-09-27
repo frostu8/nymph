@@ -271,7 +271,7 @@ where
     .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, limit))
 }
 
-/// Fetches the upgrade of a card.
+/// Gets the upgrade of a card.
 pub async fn get_upgrade_of<'e, E>(
     db: E,
     guild_id: impl Into<u64>,
@@ -285,7 +285,8 @@ where
     sqlx::query_as(
         r#"
         SELECT
-            id, guild_id, name, category_name, content, inserted_at, updated_at
+            id, guild_id, name, category_name, content, public, inserted_at,
+            updated_at
         FROM
             card
         WHERE
@@ -299,7 +300,49 @@ where
     .await
 }
 
-/// Fetches the downgrade of a card.
+/// Gets the upgrade of a card with information about its ownership.
+pub async fn fetch_upgrade_of<'e, E>(
+    db: E,
+    user_id: impl Into<u64>,
+    guild_id: impl Into<u64>,
+    id: i32,
+) -> Result<Option<FetchResult>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let guild_id = guild_id.into() as i64;
+    let user_id = user_id.into() as i64;
+
+    sqlx::query_as(
+        r#"
+        SELECT
+            c.id,
+            c.guild_id,
+            c.name,
+            c.category_name,
+            c.content,
+            c.public,
+            c.inserted_at,
+            c.updated_at,
+            COALESCE(o.owned, FALSE) AS owned
+        FROM
+            card AS c
+        LEFT OUTER JOIN
+            ownership AS o
+            ON o.card_id = c.id AND o.owner_id = $2
+        WHERE
+            c.guild_id = $1 AND
+            c.previous_id = $3
+        "#,
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+/// Gets the downgrade of a card.
 pub async fn get_downgrade_of<'e, E>(
     db: E,
     guild_id: impl Into<u64>,
@@ -318,6 +361,7 @@ where
             down.name,
             down.category_name,
             down.content,
+            down.public,
             down.inserted_at,
             down.updated_at
         FROM
@@ -331,6 +375,51 @@ where
         "#,
     )
     .bind(guild_id)
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+/// Gets the downgrade of a card with information about its ownership.
+pub async fn fetch_downgrade_of<'e, E>(
+    db: E,
+    user_id: impl Into<u64>,
+    guild_id: impl Into<u64>,
+    id: i32,
+) -> Result<Option<FetchResult>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let guild_id = guild_id.into() as i64;
+    let user_id = user_id.into() as i64;
+
+    sqlx::query_as(
+        r#"
+        SELECT
+            down.id,
+            down.guild_id,
+            down.name,
+            down.category_name,
+            down.content,
+            down.public,
+            down.inserted_at,
+            down.updated_at,
+            COALESCE(o.owned, FALSE) AS owned
+        FROM
+            card AS down
+        JOIN
+            card AS up
+            ON down.id = up.previous_id
+        LEFT OUTER JOIN
+            ownership AS o
+            ON o.card_id = down.id AND o.owner_id = $2
+        WHERE
+            down.guild_id = $1 AND
+            up.id = $3
+        "#,
+    )
+    .bind(guild_id)
+    .bind(user_id)
     .bind(id)
     .fetch_optional(db)
     .await
