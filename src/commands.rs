@@ -42,7 +42,7 @@ impl Deref for Context {
 }
 
 /// Returns a list of commands the bot offers.
-pub fn commands() -> [Command; 2] {
+pub fn commands() -> [Command; 3] {
     [
         CommandBuilder::new(
             "s",
@@ -57,16 +57,35 @@ pub fn commands() -> [Command; 2] {
                 .required(true),
         )
         .build(),
-        CommandBuilder::new("grant", "Grants a card to a member", CommandType::ChatInput)
-            .integration_types([ApplicationIntegrationType::GuildInstall])
-            .contexts([InteractionContextType::Guild])
-            .default_member_permissions(Permissions::MANAGE_GUILD)
-            .option(UserBuilder::new("user", "The member to give the card to").required(true))
-            .option(
-                StringBuilder::new("name", "The name of the card")
-                    .autocomplete(true)
-                    .required(true),
-            )
-            .build(),
+        CommandBuilder::new(
+            "grant",
+            "Grants a card to a member, allowing them to view it with /s",
+            CommandType::ChatInput,
+        )
+        .integration_types([ApplicationIntegrationType::GuildInstall])
+        .contexts([InteractionContextType::Guild])
+        .default_member_permissions(Permissions::MANAGE_GUILD)
+        .option(UserBuilder::new("user", "The member to give the card to").required(true))
+        .option(
+            StringBuilder::new("name", "The name of the card")
+                .autocomplete(true)
+                .required(true),
+        )
+        .build(),
+        CommandBuilder::new(
+            "revoke",
+            "Takes a card from a member",
+            CommandType::ChatInput,
+        )
+        .integration_types([ApplicationIntegrationType::GuildInstall])
+        .contexts([InteractionContextType::Guild])
+        .default_member_permissions(Permissions::MANAGE_GUILD)
+        .option(UserBuilder::new("user", "The member to take from").required(true))
+        .option(
+            StringBuilder::new("name", "The name of the card")
+                .autocomplete(true)
+                .required(true),
+        )
+        .build(),
     ]
 }

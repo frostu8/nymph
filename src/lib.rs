@@ -5,3 +5,4 @@ pub mod commands;
 pub mod config;
 pub mod dispatch;
 pub mod models;
+pub mod user;

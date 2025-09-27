@@ -6,6 +6,7 @@ use sqlx::{Error, Executor, FromRow, Postgres};
 
 use derive_more::Deref;
 
+use textdistance::{Algorithm, Levenshtein};
 use twilight_model::id::{Id, marker::GuildMarker};
 
 /// A single card.
@@ -207,11 +208,46 @@ where
     .bind(query.as_ref())
     .fetch_all(db)
     .await
-    .map(|result| result.into_iter().map(|(s,)| s).collect())
+    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, 8))
 }
 
-/// Given a search query, gets a list of cards by name, returning the names of
-/// each card sorted by relevance.
+/// Searches a user's card inventory given
+pub async fn search_inventory<'e, E>(
+    db: E,
+    guild_id: impl Into<u64>,
+    user_id: impl Into<u64>,
+    query: impl AsRef<str>,
+) -> Result<Vec<String>, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let guild_id = guild_id.into() as i64;
+    let user_id = user_id.into() as i64;
+
+    sqlx::query_as::<_, (String,)>(
+        r#"
+        SELECT
+            c.name
+        FROM
+            card AS c
+        LEFT OUTER JOIN
+            ownership AS o
+            ON o.card_id = c.id AND o.owner_id = $2
+        WHERE
+            c.guild_id = $1 AND
+            COALESCE(o.owned, FALSE) AND
+            c.name LIKE CONCAT('%', $3, '%')
+        "#,
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(query.as_ref())
+    .fetch_all(db)
+    .await
+    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, 8))
+}
+
+/// Searches all cards with a search query.
 pub async fn search<'e, E>(
     db: E,
     guild_id: impl Into<u64>,
@@ -229,7 +265,7 @@ where
     .bind(query.as_ref())
     .fetch_all(db)
     .await
-    .map(|result| result.into_iter().map(|(s,)| s).collect())
+    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, 8))
 }
 
 /// Fetches the upgrade of a card.
@@ -295,4 +331,38 @@ where
     .bind(id)
     .fetch_optional(db)
     .await
+}
+
+fn sort_results(
+    cards: impl IntoIterator<Item = String>,
+    query: impl AsRef<str>,
+    limit: usize,
+) -> Vec<String> {
+    let query = query.as_ref();
+
+    // results that start with the query are prioritized
+    let mut top = Vec::new();
+    let mut bottom = Vec::new();
+
+    for card in cards {
+        if card.starts_with(query) {
+            top.push(card);
+        } else {
+            bottom.push(card);
+        }
+    }
+
+    // sort by lexicographic score
+    let textdistance = Levenshtein::default();
+    let sorter = |a: &String, b: &String| {
+        let a = textdistance.for_str(a, query).val();
+        let b = textdistance.for_str(b, query).val();
+        a.cmp(&b)
+    };
+
+    top.sort_unstable_by(&sorter);
+    bottom.sort_unstable_by(&sorter);
+
+    // combine and limit
+    top.into_iter().chain(bottom).take(limit).collect()
 }
