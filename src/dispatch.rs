@@ -76,16 +76,15 @@ async fn slash_command(
     interaction: &Interaction,
     data: Box<CommandData>,
 ) -> anyhow::Result<()> {
-    let Some(guild_id) = interaction.guild_id else {
-        anyhow::bail!("missing guild id in interaction");
-    };
-    let Some(user_id) = interaction
+    let guild_id = interaction
+        .guild_id
+        .ok_or_else(|| anyhow::Error::msg("missing guild id in interaction"))?;
+    let user_id = interaction
         .member
         .as_ref()
-        .and_then(|m| m.user.as_ref().map(|u| u.id))
-    else {
-        anyhow::bail!("missing user id in interaciton");
-    };
+        .and_then(|m| m.user.as_ref())
+        .map(|u| u.id)
+        .ok_or_else(|| anyhow::Error::msg("missing member in interaction"))?;
 
     match data.name.as_str() {
         "s" => {
@@ -338,16 +337,15 @@ async fn autocomplete(
     interaction: &Interaction,
     data: Box<CommandData>,
 ) -> anyhow::Result<()> {
-    let Some(guild_id) = interaction.guild_id else {
-        anyhow::bail!("missing guild id in interaction");
-    };
-    let Some(user_id) = interaction
+    let guild_id = interaction
+        .guild_id
+        .ok_or_else(|| anyhow::Error::msg("missing guild id in interaction"))?;
+    let user_id = interaction
         .member
         .as_ref()
-        .and_then(|m| m.user.as_ref().map(|u| u.id))
-    else {
-        anyhow::bail!("missing user id in interaciton");
-    };
+        .and_then(|m| m.user.as_ref())
+        .map(|u| u.id)
+        .ok_or_else(|| anyhow::Error::msg("missing member in interaction"))?;
 
     match data.name.as_str() {
         "s" | "grant" => {
@@ -461,13 +459,20 @@ async fn message_component(
     // buttons that show cards.
     let custom_id = data.custom_id.as_str();
 
+    let user_id = interaction
+        .member
+        .as_ref()
+        .and_then(|m| m.user.as_ref())
+        .map(|u| u.id)
+        .ok_or_else(|| anyhow::Error::msg("missing member in interaction"))?;
+
     if let Some(card_id) = custom_id.strip_prefix("update_with_card:") {
         // this is a show card button!
         // parse the card id
         let card_id = card_id.parse::<i32>().context("malformed card id")?;
 
         // fetch card
-        let card = card::get_by_id(&cx.db, card_id).await?;
+        let card = card::fetch_by_id(&cx.db, user_id, card_id).await?;
         update_card(&cx, &interaction, &card).await?;
     }
 

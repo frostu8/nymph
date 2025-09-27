@@ -72,7 +72,7 @@ impl Card {
 
 /// A single card with ownership details, returned by [`fetch`].
 #[derive(Clone, Debug, Deref, FromRow)]
-pub struct FetchResult {
+pub struct CardWithMetadata {
     #[sqlx(flatten)]
     #[deref]
     pub card: Card,
@@ -85,7 +85,7 @@ pub async fn fetch<'e, E>(
     user_id: impl Into<u64>,
     guild_id: impl Into<u64>,
     name: impl AsRef<str>,
-) -> Result<Option<FetchResult>, Error>
+) -> Result<Option<CardWithMetadata>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -167,6 +167,44 @@ where
         "#,
     )
     .bind(id)
+    .fetch_one(db)
+    .await
+}
+
+/// Fetches a single card by id, returning metadata about the card's ownership.
+pub async fn fetch_by_id<'e, E>(
+    db: E,
+    user_id: impl Into<u64>,
+    id: i32,
+) -> Result<CardWithMetadata, Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let user_id = user_id.into() as i64;
+
+    sqlx::query_as(
+        r#"
+        SELECT
+            c.id,
+            c.guild_id,
+            c.name,
+            c.category_name,
+            c.content,
+            c.public,
+            c.inserted_at,
+            c.updated_at,
+            COALESCE(o.owned, FALSE) AS owned
+        FROM
+            card AS c
+        LEFT OUTER JOIN
+            ownership AS o
+            ON o.card_id = c.id AND o.owner_id = $2
+        WHERE
+            c.id = $1
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
     .fetch_one(db)
     .await
 }
@@ -306,7 +344,7 @@ pub async fn fetch_upgrade_of<'e, E>(
     user_id: impl Into<u64>,
     guild_id: impl Into<u64>,
     id: i32,
-) -> Result<Option<FetchResult>, Error>
+) -> Result<Option<CardWithMetadata>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -386,7 +424,7 @@ pub async fn fetch_downgrade_of<'e, E>(
     user_id: impl Into<u64>,
     guild_id: impl Into<u64>,
     id: i32,
-) -> Result<Option<FetchResult>, Error>
+) -> Result<Option<CardWithMetadata>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
