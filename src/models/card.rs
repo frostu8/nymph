@@ -181,6 +181,7 @@ pub async fn search_visible<'e, E>(
     user_id: impl Into<u64>,
     guild_id: impl Into<u64>,
     query: impl AsRef<str>,
+    limit: usize,
 ) -> Result<Vec<String>, Error>
 where
     E: Executor<'e, Database = Postgres>,
@@ -208,7 +209,7 @@ where
     .bind(query.as_ref())
     .fetch_all(db)
     .await
-    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, 8))
+    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, limit))
 }
 
 /// Searches a user's card inventory given
@@ -217,6 +218,7 @@ pub async fn search_inventory<'e, E>(
     guild_id: impl Into<u64>,
     user_id: impl Into<u64>,
     query: impl AsRef<str>,
+    limit: usize,
 ) -> Result<Vec<String>, Error>
 where
     E: Executor<'e, Database = Postgres>,
@@ -244,7 +246,7 @@ where
     .bind(query.as_ref())
     .fetch_all(db)
     .await
-    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, 8))
+    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, limit))
 }
 
 /// Searches all cards with a search query.
@@ -252,6 +254,7 @@ pub async fn search<'e, E>(
     db: E,
     guild_id: impl Into<u64>,
     query: impl AsRef<str>,
+    limit: usize,
 ) -> Result<Vec<String>, Error>
 where
     E: Executor<'e, Database = Postgres>,
@@ -265,7 +268,7 @@ where
     .bind(query.as_ref())
     .fetch_all(db)
     .await
-    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, 8))
+    .map(|result| sort_results(result.into_iter().map(|(s,)| s), query, limit))
 }
 
 /// Fetches the upgrade of a card.

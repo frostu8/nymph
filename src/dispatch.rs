@@ -26,6 +26,9 @@ use crate::{
     user::{GrantTargetError, validate_grant},
 };
 
+/// The limit for autocomplete entries.
+pub const AUTOCOMPLETE_ENTRY_LEN: usize = 25;
+
 /// Handles an interaction.
 #[instrument(skip(cx, interaction))]
 pub async fn interaction(cx: Context, mut interaction: Box<InteractionCreate>) {
@@ -366,9 +369,10 @@ async fn autocomplete(
             // get cards with name
             // search with administrator permissions if using grant
             let cards = if data.name.as_str() == "grant" {
-                card::search(&cx.db, guild_id, &name).await?
+                card::search(&cx.db, guild_id, &name, AUTOCOMPLETE_ENTRY_LEN).await?
             } else {
-                card::search_visible(&cx.db, user_id, guild_id, &name).await?
+                card::search_visible(&cx.db, user_id, guild_id, &name, AUTOCOMPLETE_ENTRY_LEN)
+                    .await?
             };
 
             // map into choices
@@ -413,9 +417,10 @@ async fn autocomplete(
             // get cards with name
             // search with administrator permissions if using grant
             let cards = if data.name.as_str() == "grant" {
-                card::search(&cx.db, guild_id, &name).await?
+                card::search(&cx.db, guild_id, &name, AUTOCOMPLETE_ENTRY_LEN).await?
             } else {
-                card::search_visible(&cx.db, user_id, guild_id, &name).await?
+                card::search_visible(&cx.db, user_id, guild_id, &name, AUTOCOMPLETE_ENTRY_LEN)
+                    .await?
             };
 
             // map into choices
