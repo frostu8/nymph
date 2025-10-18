@@ -19,9 +19,11 @@ use nymph_server::{
     routes,
 };
 
+use tokio::{main, select, signal};
+
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 
-#[tokio::main]
+#[main]
 async fn main() -> Result<(), Error> {
     sqlx::any::install_default_drivers();
     dotenv::dotenv().ok();
@@ -48,6 +50,7 @@ async fn main() -> Result<(), Error> {
     }
 
     let state = AppState::new(config.server).await?;
+    let db = state.db.clone();
 
     // Execute command if it exists
     if let Some(command) = args.command {
@@ -102,10 +105,17 @@ async fn main() -> Result<(), Error> {
     // Serve HTTP
     tracing::info!("listening on {} (http)", addr);
 
-    axum_server::bind(addr)
-        .serve(router.into_make_service())
-        .await
-        .map_err(From::from)
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, router.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+
+    // Close Sql connection
+    db.close().await;
+
+    tracing::info!("graceful shutdown complete!");
+
+    Ok(())
 }
 
 // Stolen from: https://github.com/tokio-rs/axum/blob/main/examples/error-handling/src/main.rs
@@ -117,4 +127,30 @@ async fn log_app_errors(request: Request, next: Next) -> Response {
         tracing::error!(?err, "an unexpected error occurred inside a handler");
     }
     response
+}
+
+// Stolen from: https://github.com/maxcountryman/tower-sessions-stores/tree/main/sqlx-store
+// Lol
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    select! {
+        _ = ctrl_c => { },
+        _ = terminate => { },
+    }
 }
