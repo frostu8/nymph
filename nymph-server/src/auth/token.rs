@@ -16,15 +16,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 
 use crate::app::{AppError, AppErrorKind, AppState, SigningKeys};
 
+use super::AuthenticatedUser;
+
 /// Token-based authentication.
 #[derive(Clone, Debug)]
 pub struct TokenAuthentication {
-    /// The id of the authorized user.
-    pub sub: Sub,
-    /// The expiry time of the authorization.
-    ///
-    /// May be `None` if the user was authenticated through mTLS.
-    pub exp: Option<DateTime<Utc>>,
+    /// The authenticated user.
+    pub user: AuthenticatedUser,
+    /// The expiry time of the authentication.
+    pub exp: DateTime<Utc>,
     /// If the token used to authenticate this request was a proxy token.
     pub proxy: bool,
 }
@@ -50,29 +50,48 @@ where
             .and_then(|s| s.strip_prefix("Bearer"))
             .map(|s| s.trim());
 
-        let auth = if let Some(token) = token {
+        if let Some(token) = token {
             let state = AppState::from_ref(state);
 
             // decode jwt
-            Claims::decode(token, &state.keys)
-                .map(|claims| TokenAuthentication {
-                    sub: claims.sub(),
-                    exp: Some(
-                        DateTime::from_timestamp_secs(claims.exp())
-                            .expect("valid signed timestamp"),
-                    ),
-                    proxy: claims.proxy(),
-                })
-                .map_err(AppErrorKind::InvalidAuthorization)?
+            let claims = Claims::decode(token, &state.keys).map_err(AppErrorKind::InvalidJwt)?;
+            let exp = DateTime::from_timestamp_secs(claims.exp()).expect("valid signed timestamp");
+
+            // get user
+            let user = sqlx::query_as::<_, AuthenticatedUser>(
+                r#"
+                SELECT
+                    u.id, u.display_name, u.managed
+                FROM
+                    user u
+                WHERE
+                    u.id = $1
+                "#,
+            )
+            .bind(claims.sub().get())
+            .fetch_optional(&state.db)
+            .await?;
+
+            match user {
+                Some(user) => {
+                    let auth = TokenAuthentication {
+                        user,
+                        exp,
+                        proxy: claims.proxy(),
+                    };
+
+                    // cache to extensions
+                    parts.extensions.insert(auth.clone());
+
+                    Ok(auth)
+                }
+                // user may have been deleted?
+                None => Err(AppErrorKind::Unauthenticated.into()),
+            }
         } else {
-            // bail because unauthorized
-            return Err(AppErrorKind::Unauthorized.into());
-        };
-
-        // cache to extensions
-        parts.extensions.insert(auth.clone());
-
-        Ok(auth)
+            // bail because unauthenticated
+            Err(AppErrorKind::Unauthenticated.into())
+        }
     }
 }
 

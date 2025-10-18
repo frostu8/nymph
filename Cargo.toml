@@ -12,6 +12,7 @@ edition = "2024"
 [workspace.dependencies]
 nymph-model = { path = "./nymph-model" }
 anyhow = "1"
+clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 derive_more = "2"
 serde = { version = "1", features = ["derive"] }
@@ -33,5 +34,5 @@ http = "1"
 futures-util = "0.3"
 textdistance = "1"
 reqwest = "0.12"
-secstr = "0.5"
 dashmap = "6"
+sha2 = "0.10"

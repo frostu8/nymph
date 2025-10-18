@@ -190,6 +190,10 @@ pub struct AppError {
 }
 
 impl AppError {
+    pub fn kind(&self) -> &AppErrorKind {
+        &self.kind
+    }
+
     /// Checks if an error is internal.
     pub fn is_internal(&self) -> bool {
         self.kind.is_internal()
@@ -218,7 +222,7 @@ impl std::error::Error for AppError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &self.kind {
             AppErrorKind::Json(err) => Some(err),
-            AppErrorKind::InvalidAuthorization(err) => Some(err),
+            AppErrorKind::InvalidJwt(err) => Some(err),
             AppErrorKind::Database(err) => Some(err),
             _ => None,
         }
@@ -277,12 +281,15 @@ pub enum AppErrorKind {
     /// resource.
     #[display("Not enough permissions")]
     InsufficientPermissions,
-    /// Authorization is invalid.
+    /// Jwt used to authenticate is invalid.
     #[display("{_0}")]
-    InvalidAuthorization(JwtError),
-    /// Authorization is missing.
+    InvalidJwt(JwtError),
+    /// API key used to authenticate is invalid.
+    #[display("API key is invalid")]
+    InvalidApiKey,
+    /// Authentication is missing.
     #[display("Request unauthenticated")]
-    Unauthorized,
+    Unauthenticated,
     /// Missing mTLS certificate for secured route.
     #[display("Missing mTLS certificate for secured route")]
     MissingCertificate,
@@ -434,7 +441,7 @@ impl IntoResponse for AppError {
                 },
                 None,
             ),
-            AppErrorKind::InvalidAuthorization(err) => (
+            AppErrorKind::InvalidJwt(err) => (
                 StatusCode::UNAUTHORIZED,
                 ApiError {
                     code: ErrorCode::BadCredentials,
@@ -449,13 +456,21 @@ impl IntoResponse for AppError {
                 },
                 None,
             ),
-            AppErrorKind::Unauthorized
+            AppErrorKind::InvalidApiKey => (
+                StatusCode::UNAUTHORIZED,
+                ApiError {
+                    code: ErrorCode::BadCredentials,
+                    message: "Invalid API key.".into(),
+                },
+                None,
+            ),
+            AppErrorKind::Unauthenticated
             | AppErrorKind::MissingCertificate
             | AppErrorKind::InvalidCommonName => (
                 StatusCode::UNAUTHORIZED,
                 ApiError {
-                    code: ErrorCode::Unauthorized,
-                    message: "Request is unauthorized.".into(),
+                    code: ErrorCode::Unauthenticated,
+                    message: "Request is unauthenticated.".into(),
                 },
                 None,
             ),

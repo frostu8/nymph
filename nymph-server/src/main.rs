@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use anyhow::Error;
 
@@ -10,8 +10,11 @@ use axum::{
     routing::{delete, get, post},
 };
 
+use clap::Parser as _;
+
 use nymph_server::{
     app::{AppError, AppState, random_signing_key},
+    cli::{Args, run_command},
     config::Config,
     routes,
 };
@@ -20,12 +23,18 @@ use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt::init();
     sqlx::any::install_default_drivers();
     dotenv::dotenv().ok();
 
+    tracing_subscriber::fmt::fmt()
+        .with_writer(io::stderr)
+        .init();
+
+    let args = Args::parse();
+
     // load config
-    let mut config = Config::load("nymph.toml")?;
+    let config_path = args.config.unwrap_or_else(|| PathBuf::from("./nymph.toml"));
+    let mut config = Config::load(config_path)?;
 
     // check for development defaults
     if config.server.signing_key.is_none() {
@@ -39,6 +48,12 @@ async fn main() -> Result<(), Error> {
     }
 
     let state = AppState::new(config.server).await?;
+
+    // Execute command if it exists
+    if let Some(command) = args.command {
+        return run_command(&command, &state).await;
+    }
+
     let addr: SocketAddr = ([0, 0, 0, 0], state.port).into();
 
     // Build router

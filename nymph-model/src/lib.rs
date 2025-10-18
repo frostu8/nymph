@@ -88,7 +88,7 @@ pub enum ErrorCode {
     /// The card is not owned by the user.
     Unowned,
     /// The user is unauthorized.
-    Unauthorized,
+    Unauthenticated,
     /// The user's credentials have expired or are otherwise bad.
     BadCredentials,
     /// The user does not have the right permissions to access a resource.
@@ -108,7 +108,7 @@ impl From<u32> for ErrorCode {
             4001 => ErrorCode::InvalidData,
             4002 => ErrorCode::UnsupportedContentType,
             4003 => ErrorCode::NotFound,
-            4004 => ErrorCode::Unauthorized,
+            4004 => ErrorCode::Unauthenticated,
             4005 => ErrorCode::Forbidden,
             4006 => ErrorCode::Hidden,
             4007 => ErrorCode::InsufficientPermissions,
@@ -128,7 +128,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidData => 4001,
             ErrorCode::UnsupportedContentType => 4002,
             ErrorCode::NotFound => 4003,
-            ErrorCode::Unauthorized => 4004,
+            ErrorCode::Unauthenticated => 4004,
             ErrorCode::Forbidden => 4005,
             ErrorCode::Hidden => 4006,
             ErrorCode::InsufficientPermissions => 4007,

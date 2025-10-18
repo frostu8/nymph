@@ -1,80 +1,65 @@
 //! Service authentication.
 
+pub mod api_key;
 pub mod token;
 
+pub use api_key::ApiKeyAuthentication;
 pub use token::{Claims, ClaimsBuilder, Sub, TokenAuthentication};
 
-use chrono::{DateTime, Utc};
+use axum::{
+    RequestPartsExt,
+    extract::{FromRef, FromRequestParts},
+};
+
+use derive_more::Deref;
+
+use http::request::Parts;
 
 use sqlx::FromRow;
 
-use crate::app::{AppError, AppState};
+use crate::app::{AppError, AppErrorKind, AppState};
 
-async fn get_or_create_bot_user(state: &AppState, cname: impl AsRef<str>) -> Result<Sub, AppError> {
-    // try to fetch user
-    let id = sqlx::query_as::<_, (i32,)>(
-        r#"
-        SELECT id
-        FROM user u, mtls_auth ma
-        WHERE
-            u.id = ma.user_id
-            AND ma.common_name = $1
-        "#,
-    )
-    .bind(cname.as_ref())
-    .fetch_optional(&state.db)
-    .await?;
+/// An authenticated user.
+#[derive(Clone, Debug, FromRow)]
+pub struct AuthenticatedUser {
+    /// The ID of the authenticated user.
+    pub id: i32,
+    /// The user's display name.
+    pub display_name: String,
+    /// The user if they are managed.
+    pub managed: bool,
+}
 
-    if let Some((id,)) = id {
-        Ok(Sub::from(id))
-    } else {
-        #[derive(Debug, FromRow)]
-        #[allow(dead_code)]
-        struct User {
-            id: i32,
-            display_name: String,
-            bot: bool,
-            inserted_at: DateTime<Utc>,
-            updated_at: DateTime<Utc>,
+/// Authentication guard.
+///
+/// This doesn't care how a user gets authenticated, just that they eventually
+/// will be authenticated.
+#[derive(Clone, Debug, Deref)]
+pub struct Authentication(AuthenticatedUser);
+
+impl<S> FromRequestParts<S> for Authentication
+where
+    AppState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let api_key = parts
+            .extract_with_state::<ApiKeyAuthentication, S>(state)
+            .await
+            .map(|api_key| Authentication(api_key.user.clone()));
+
+        match api_key {
+            Ok(api_key) => Ok(api_key),
+            Err(err) if matches!(err.kind(), AppErrorKind::Unauthenticated) => {
+                // try token auth
+                parts
+                    .extract_with_state::<TokenAuthentication, S>(state)
+                    .await
+                    .map(|token| Authentication(token.user.clone()))
+            }
+            Err(err) => Err(err),
         }
-
-        let mut tx = state.db.begin().await?;
-
-        let now = Utc::now();
-
-        // create new user
-        let new_user = sqlx::query_as::<_, User>(
-            r#"
-            INSERT INTO user (display_name, bot, inserted_at, updated_at)
-            VALUES ($1, TRUE, $2, $2)
-            RETURNING *
-            "#,
-        )
-        .bind(cname.as_ref())
-        .bind(now)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        tracing::info!(
-            ?new_user,
-            "created user for mtls authenticated client `{}`",
-            cname.as_ref()
-        );
-
-        // create mtls auth entry
-        sqlx::query(
-            r#"
-            INSERT INTO mtls_auth (user_id, common_name)
-            VALUES ($1, $2)
-            "#,
-        )
-        .bind(new_user.id)
-        .bind(cname.as_ref())
-        .execute(&mut *tx)
-        .await?;
-
-        tx.commit().await?;
-
-        Ok(Sub::from(new_user.id))
     }
 }

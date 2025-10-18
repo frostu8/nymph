@@ -17,7 +17,7 @@ CREATE TABLE user (
     id INTEGER PRIMARY KEY,
     display_name VARCHAR(255) NOT NULL,
     -- marker flag for automated users
-    bot BOOLEAN NOT NULL DEFAULT FALSE,
+    managed BOOLEAN NOT NULL DEFAULT FALSE,
     inserted_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
@@ -33,12 +33,13 @@ CREATE TABLE ownership (
 -- discord authentication
 CREATE TABLE discord_auth (
     user_id INTEGER NOT NULL UNIQUE REFERENCES user(id),
-    discord_id BIGINT NOT NULL UNIQUE
+    discord_id BIGINT NOT NULL UNIQUE,
+    inserted_at TIMESTAMP NOT NULL
 );
 
 -- api-key based authentication
 CREATE TABLE api_auth (
     user_id INTEGER NOT NULL REFERENCES user(id),
-    hash CHAR(64) NOT NULL,
+    hash CHAR(64) NOT NULL UNIQUE,
     inserted_at TIMESTAMP NOT NULL
 );

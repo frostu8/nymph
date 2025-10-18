@@ -29,11 +29,15 @@ impl Config {
         Figment::new()
             .merge(Toml::file(config_path))
             .merge(Env::prefixed("NYMPH_"))
-            .merge(
-                Env::raw()
-                    .only(&["DISCORD_TOKEN"])
-                    .map(|k| Uncased::from(format!("GENERAL.{}", k))),
-            )
+            .merge(Env::raw().only(&["DISCORD_TOKEN", "API_KEY"]).map(|k| {
+                if k == "DISCORD_TOKEN" {
+                    Uncased::from("GENERAL.DISCORD_TOKEN")
+                } else if k == "API_KEY" {
+                    Uncased::from("API.KEY")
+                } else {
+                    k.into()
+                }
+            }))
             .extract()
     }
 }
@@ -53,6 +57,8 @@ pub struct GeneralConfig {
 pub struct ApiConfig {
     /// The API endpoint.
     pub endpoint: String,
+    /// The API key
+    pub key: String,
     /// How many times the bot should refresh.
     #[serde(default = "token_refresh_retries_default")]
     pub token_refresh_retries: u32,

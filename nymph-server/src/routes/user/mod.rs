@@ -1,8 +1,8 @@
 //! User editing and authorization.
 
 use crate::{
-    app::{AppError, AppJson, AppState},
-    auth::Claims,
+    app::{AppError, AppErrorKind, AppJson, AppState},
+    auth::{Authentication, Claims},
 };
 
 use axum::{debug_handler, extract::State};
@@ -20,14 +20,19 @@ use nymph_model::{request::user::UserProxyRequest, response::user::UserProxyResp
 #[debug_handler]
 pub async fn proxy_for(
     State(state): State<AppState>,
+    auth: Authentication,
     AppJson(request): AppJson<UserProxyRequest>,
 ) -> Result<AppJson<UserProxyResponse>, AppError> {
+    if !auth.managed {
+        return Err(AppErrorKind::Forbidden.into());
+    }
+
     #[derive(Debug, FromRow)]
     #[allow(dead_code)]
     struct User {
         id: i32,
         display_name: String,
-        bot: bool,
+        managed: bool,
         inserted_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
     }
@@ -38,7 +43,7 @@ pub async fn proxy_for(
 
     let user = sqlx::query_as::<_, User>(
         r#"
-        SELECT u.id, u.display_name, u.bot, u.inserted_at, u.updated_at
+        SELECT u.id, u.display_name, u.managed, u.inserted_at, u.updated_at
         FROM user u, discord_auth da
         WHERE
             u.id = da.user_id
@@ -82,7 +87,7 @@ pub async fn proxy_for(
                 r#"
                 INSERT INTO user (display_name, inserted_at, updated_at)
                 VALUES ($1, $2, $2)
-                RETURNING id, display_name, bot, inserted_at, updated_at
+                RETURNING id, display_name, managed, inserted_at, updated_at
                 "#,
             )
             .bind(&request.display_name)
@@ -95,12 +100,13 @@ pub async fn proxy_for(
             // create discord auth
             sqlx::query(
                 r#"
-                INSERT INTO discord_auth (user_id, discord_id)
-                VALUES ($1, $2)
+                INSERT INTO discord_auth (user_id, discord_id, inserted_at)
+                VALUES ($1, $2, $3)
                 "#,
             )
             .bind(user.id)
             .bind(request.discord_id.get() as i64)
+            .bind(now)
             .execute(&mut *tx)
             .await?;
 

@@ -22,7 +22,6 @@ tracing-subscriber = { workspace = true}
 http = { workspace = true }
 reqwest = { workspace = true, features = ["json", "deflate", "rustls-tls"] }
 futures-util = { workspace = true }
-secstr = { workspace = true }
 dashmap = { workspace = true }
 
 [dependencies.twilight-cache-inmemory]

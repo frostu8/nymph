@@ -4,8 +4,6 @@ use super::request::user::UserProxy;
 
 use anyhow::Error;
 
-use std::fs::{self, File};
-use std::io::Read;
 use std::sync::Arc;
 
 use derive_more::{Display, Error};
@@ -16,12 +14,10 @@ use crate::http::request::card::{GetCard, ListCards};
 
 use dashmap::DashMap;
 
-use http::{HeaderValue, Method, header};
+use http::{HeaderName, HeaderValue, Method, header};
 
 use nymph_model::ErrorCode;
 use nymph_model::{Error as ApiError, response::user::UserProxyResponse};
-
-use reqwest::Certificate;
 
 use serde::Serialize;
 use twilight_model::id::marker::GuildMarker;
@@ -45,6 +41,7 @@ pub struct Client {
 #[derive(Debug)]
 struct ClientState {
     endpoint: String,
+    api_key: String,
     token_store: DashMap<Id<UserMarker>, String>,
 }
 
@@ -58,6 +55,7 @@ impl Client {
 
         let state = ClientState {
             endpoint: config.endpoint.to_owned(),
+            api_key: config.key.to_owned(),
             token_store: DashMap::new(),
         };
 
@@ -197,7 +195,13 @@ impl Request {
 
             Err(TokenRefreshError.into())
         } else {
+            request.headers_mut().insert(
+                HeaderName::from_static("x-api-key"),
+                HeaderValue::from_str(&self.client.state.api_key).expect("valid api key"),
+            );
+
             let res = self.client.http.execute(request).await?;
+
             if res.status().is_success() {
                 Ok(res)
             } else {

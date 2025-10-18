@@ -16,7 +16,7 @@ use super::CardResult;
 
 use crate::{
     app::{AppError, AppErrorKind, AppJson, AppQuery, AppState, Payload},
-    auth::TokenAuthentication,
+    auth::Authentication,
     routes::{Pagination, card::get_card},
 };
 
@@ -26,11 +26,11 @@ pub async fn list(
     Path((user_id,)): Path<(i32,)>,
     AppQuery(query): AppQuery<ListInventoryQuery>,
     State(state): State<AppState>,
-    authorization: TokenAuthentication,
+    auth: Authentication,
 ) -> Result<AppJson<Vec<Card>>, AppError> {
     // TODO: finer grained permissions
     // if this is the authorized user, they can always list their own cards
-    if authorization.sub.get() == user_id {
+    if auth.id == user_id {
         return Err(AppErrorKind::InsufficientPermissions.into());
     }
 
@@ -48,7 +48,7 @@ pub async fn list(
                 AND c.guild_id = $2
             "#,
         )
-        .bind(authorization.sub.get())
+        .bind(auth.id)
         .bind(guild_id.get() as i64)
         .fetch_all(&state.db)
         .await?
@@ -65,7 +65,7 @@ pub async fn list(
                 AND o.owner_id = $1
             "#,
         )
-        .bind(authorization.sub.get())
+        .bind(auth.id)
         .fetch_all(&state.db)
         .await?
     };
@@ -86,16 +86,13 @@ pub async fn list(
 pub async fn grant(
     Path((user_id,)): Path<(i32,)>,
     State(state): State<AppState>,
-    authorization: TokenAuthentication,
+    auth: Authentication,
     Payload(request): Payload<GrantRequest>,
 ) -> Result<AppJson<Card>, AppError> {
     // TODO: finer grained permissions
-    if !authorization.proxy {
-        return Err(AppErrorKind::InsufficientPermissions.into());
-    }
 
     let res = update_ownership(&state.db, user_id, request.card_id, true).await?;
-    let card = get_card(&state, request.card_id, &authorization).await?;
+    let card = get_card(&state, request.card_id, &auth).await?;
 
     if res.rows_affected() > 0 {
         Ok(AppJson(card))
@@ -116,18 +113,15 @@ pub async fn grant(
 pub async fn revoke(
     Path((user_id, card_id)): Path<(i32, i32)>,
     State(state): State<AppState>,
-    authorization: TokenAuthentication,
+    auth: Authentication,
 ) -> Result<AppJson<Card>, AppError> {
     // TODO: finer grained permissions
-    if !authorization.proxy {
-        return Err(AppErrorKind::InsufficientPermissions.into());
-    }
 
     update_ownership(&state.db, user_id, card_id, false).await?;
 
     // fetch card
     let res = update_ownership(&state.db, user_id, card_id, true).await?;
-    let card = get_card(&state, card_id, &authorization).await?;
+    let card = get_card(&state, card_id, &auth).await?;
 
     if res.rows_affected() > 0 {
         Ok(AppJson(card))

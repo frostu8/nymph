@@ -23,7 +23,7 @@ use textdistance::{Algorithm as _, Levenshtein};
 
 use crate::{
     app::{AppError, AppErrorKind, AppJson, AppQuery, AppState},
-    auth::TokenAuthentication,
+    auth::Authentication,
     routes::Pagination,
 };
 
@@ -66,7 +66,7 @@ pub async fn list(
     AppQuery(query): AppQuery<ListCardsQuery>,
     State(state): State<AppState>,
     Path((guild_id,)): Path<(i64,)>,
-    authorization: TokenAuthentication,
+    auth: Authentication,
 ) -> Result<AppJson<Vec<Card>>, AppError> {
     let results = if let Some(search) = query.query.as_ref() {
         sqlx::query_as::<_, CardResult>(
@@ -85,7 +85,7 @@ pub async fn list(
                 AND c.name LIKE CONCAT('%', $3, '%')
             "#,
         )
-        .bind(authorization.sub.get())
+        .bind(auth.id)
         .bind(guild_id)
         .bind(&search)
         .fetch_all(&state.db)
@@ -106,7 +106,7 @@ pub async fn list(
                 c.guild_id = $2
             "#,
         )
-        .bind(authorization.sub.get())
+        .bind(auth.id)
         .bind(guild_id)
         .fetch_all(&state.db)
         .await?
@@ -135,7 +135,7 @@ pub async fn list(
 pub async fn show(
     State(state): State<AppState>,
     Path((guild_id, id)): Path<(i64, i32)>,
-    authorization: TokenAuthentication,
+    auth: Authentication,
 ) -> Result<AppJson<Card>, AppError> {
     // fetch main card
     let card = sqlx::query_as::<_, CardResult>(
@@ -153,7 +153,7 @@ pub async fn show(
             AND c.guild_id = $2
         "#,
     )
-    .bind(authorization.sub.get())
+    .bind(auth.id)
     .bind(guild_id)
     .bind(id)
     .fetch_optional(&state.db)
@@ -169,7 +169,7 @@ pub async fn show(
             Visibility::Private if hidden => Err(AppErrorKind::Forbidden.into()),
             // Public cards are always viewable
             _ => Ok(AppJson(
-                preload_card(&state, &authorization, Card::from(card)).await?,
+                preload_card(&state, &auth, Card::from(card)).await?,
             )),
         }
     } else {
@@ -181,7 +181,7 @@ pub async fn show(
 /// Preloads card information from an already fetched card.
 pub async fn preload_card(
     state: &AppState,
-    authorization: &TokenAuthentication,
+    auth: &Authentication,
     mut card: Card,
 ) -> Result<Card, AppError> {
     // Fetch all the upgrades for the card
@@ -200,7 +200,7 @@ pub async fn preload_card(
             c.previous_id = $2
         "#,
     )
-    .bind(authorization.sub.get())
+    .bind(auth.id)
     .bind(card.id)
     .fetch_all(&state.db)
     .await?
@@ -232,7 +232,7 @@ pub async fn preload_card(
             AND up.id = $2
     "#,
     )
-    .bind(authorization.sub.get())
+    .bind(auth.id)
     .bind(card.id)
     .fetch_optional(&state.db)
     .await?;
@@ -252,11 +252,7 @@ pub async fn preload_card(
 }
 
 /// Lower-level request handler given simply a card id.
-pub async fn get_card(
-    state: &AppState,
-    id: i32,
-    authorization: &TokenAuthentication,
-) -> Result<Card, AppError> {
+pub async fn get_card(state: &AppState, id: i32, auth: &Authentication) -> Result<Card, AppError> {
     // fetch main card
     let card = sqlx::query_as::<_, CardResult>(
         r#"
@@ -272,7 +268,7 @@ pub async fn get_card(
             c.id = $2
         "#,
     )
-    .bind(authorization.sub.get())
+    .bind(auth.id)
     .bind(id)
     .fetch_optional(&state.db)
     .await?;
@@ -285,7 +281,7 @@ pub async fn get_card(
             _ => (),
         }
 
-        let card = preload_card(state, authorization, Card::from(card)).await?;
+        let card = preload_card(state, auth, Card::from(card)).await?;
         Ok(card)
     } else {
         Err(AppError::from(AppErrorKind::NotFound)
