@@ -1,2 +1,2 @@
 [server]
-database_url = "sqlite://dev_nymph.sqlite"
+database_url = "sqlite://nymph.sqlite"
