@@ -1,0 +1,58 @@
+[general]
+embed_color = "#db0f52"
+
+[api]
+endpoint = "http://localhost:4000"
+
+[accent]
+no_cards_owned = """"The Archive has not revealed anything to you." The \
+Archivist spins a fountain pen in her hand, her gaze on it lazy and \
+heavy-lidded. "Come back when you truly believe you deserve hidden \
+knowledge.""""
+self_grant = """"Haha, I appreciate the sentiment, but I know what I know. It \
+is ultimately a sense of self that separates humanity from creatures, and it \
+is intellect that separates elves from other races.""""
+not_found = [
+    """"I've never heard of that one before." The Archivist responds with \
+    curious eyes. "But it sounds like it might be an interesting addition."""",
+    """The Archivist simply responds with a gentle shake of her head at your \
+    request.""",
+    """"My superior has dedicated his entire life to the search for absolute \
+    knowledge, so I find it unlikely we don't know of that." The Archivist \
+    replies with unsure, quaking words.""",
+    """The Archivist idly folds a paper crane, her attention divided on her \
+    task as she balances her wooden chair on two legs. "It probably doesn't \
+    exist."""",
+    """"Maybe you should ask Remy." The Archivist says meekly, her gaze \
+    averted. "I've been told 56 is a bit young to be working here..."""",
+    """"I don't know what you could be referring to." The Archivist adjusts a \
+    golden ribbon on her crimson hair, her gaze drifting upwards in a weak \
+    attempt to visualize herself. "Do you think this looks cute?"""",
+    """The Archivist shakes her head in an erratic rhythm, her face \
+    permanently frozen in a state of shock. "I-I-I don't k-know... I-I'm \
+    s-s-sorry! I-I-I was on th-th-thought f-furnace d-d-duty today..."""",
+    """The Archivist gnaws on a pen. "My boss told me that I can't say we \
+    don't know it anymore." She replied, though the pen in her mouth didn't \
+    make it any easier to understand. "So we have determined you are \
+    delusional, or have had memories implanted."""",
+]
+unauthorized = [
+    """"Ah... I was told not to discuss matters of this kind with you." The \
+    Archivist replies meekly, but her words come sharp.""",
+]
+
+[category.positive]
+suffix = "<:PositiveSet:1420275724127830056>"
+color = "#33f574"
+
+[category.neutral]
+suffix = "<:NeutralSet:1420275721733144666>"
+color = "#dcf5f3"
+
+[category.negative]
+suffix = "<:NegativeSet:1420275719883194420>"
+color = "#f22a13"
+
+[category.integral]
+suffix = "<:IntegralSet:1420275718570381433>"
+color = "#37a8e6"

@@ -1,0 +1,47 @@
+[package]
+name = "nymph-bot"
+version = "0.1.0"
+authors = ["Dante Helmore <frostu8@protonmail.com>"]
+edition = "2024"
+
+description = "Nymph Discord integration"
+
+[dependencies]
+nymph-model = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+derive_more = { workspace = true, features = ["deref", "display", "error", "from"] }
+dotenv = { workspace = true }
+figment = { workspace = true, features = ["env", "toml"] }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_urlencoded = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true}
+http = { workspace = true }
+reqwest = { workspace = true, features = ["json", "deflate", "rustls-tls"] }
+futures-util = { workspace = true }
+secstr = { workspace = true }
+dashmap = { workspace = true }
+
+[dependencies.twilight-cache-inmemory]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+
+[dependencies.twilight-gateway]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+
+[dependencies.twilight-http]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+
+[dependencies.twilight-model]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+
+[dependencies.twilight-util]
+version = "0.16"
+git = "https://github.com/twilight-rs/twilight.git"
+features = ["builder"]

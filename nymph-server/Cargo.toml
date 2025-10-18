@@ -1,0 +1,30 @@
+[package]
+name = "nymph-server"
+version = "0.1.0"
+authors = ["Dante Helmore <frostu8@protonmail.com>"]
+edition.workspace = true
+
+description = "Nymph server and API"
+
+[dependencies]
+nymph-model = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+derive_more = { workspace = true, features = ["error", "from", "into", "deref", "deref_mut", "display"] }
+dotenv = { workspace = true }
+chrono = { workspace = true }
+figment = { workspace = true, features = ["env", "toml"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono"] }
+axum = { workspace = true, features = ["macros", "query"] }
+axum-server = { workspace = true }
+tower = { workspace = true}
+tower-http = { workspace = true, features = ["trace", "compression-deflate"] }
+http = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+jsonwebtoken = { workspace = true }
+rand = { workspace = true }
+base16 = { workspace = true }
+futures-util = { workspace = true }
+textdistance = { workspace = true }
