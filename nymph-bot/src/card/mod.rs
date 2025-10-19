@@ -43,7 +43,7 @@ pub async fn autocomplete(cx: &InteractionContext, data: CommandData) -> anyhow:
     let guild_id = cx
         .guild_id
         .ok_or_else(|| Error::msg("missing guild id in interaction"))?;
-    let user = cx
+    let caller = cx
         .member
         .as_ref()
         .and_then(|m| m.user.as_ref())
@@ -65,7 +65,7 @@ pub async fn autocomplete(cx: &InteractionContext, data: CommandData) -> anyhow:
     // search card
     let choices = cx
         .db_client
-        .proxy_for(user.clone())
+        .proxy_for(&caller)
         .list_cards(guild_id)
         .search(name)
         .execute()

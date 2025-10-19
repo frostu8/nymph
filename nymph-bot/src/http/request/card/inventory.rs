@@ -42,3 +42,41 @@ impl GrantCard {
         Ok(request.json().await?)
     }
 }
+
+/// Revokes a card from a user.
+#[derive(Debug)]
+pub struct RevokeCard {
+    client: Client,
+    user_id: i32,
+    card_id: i32,
+}
+
+impl RevokeCard {
+    /// Creates a new `RevokeCard`.
+    pub fn new(client: Client, user_id: i32, card_id: i32) -> RevokeCard {
+        RevokeCard {
+            client,
+            user_id,
+            card_id,
+        }
+    }
+
+    /// Sends the request.
+    pub async fn execute(self) -> Result<Card, Error> {
+        let RevokeCard {
+            client,
+            user_id,
+            card_id,
+        } = self;
+
+        let request = client
+            .request(
+                Method::DELETE,
+                format!("/users/{}/cards/{}", user_id, card_id),
+            )
+            .send()
+            .await?;
+
+        Ok(request.json().await?)
+    }
+}

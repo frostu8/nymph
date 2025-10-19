@@ -77,14 +77,11 @@ impl ListCards {
             count,
         } = self;
 
-        let query = serde_urlencoded::ser::to_string(&ListCardsQuery { query, page, count })?;
-
-        let mut url = format!("/guilds/{}/cards", guild_id);
-        if query.len() > 0 {
-            url = format!("{}?{}", url, query);
-        }
-
-        let request = client.request(Method::GET, url).send().await?;
+        let request = client
+            .request(Method::GET, format!("/guilds/{}/cards", guild_id))
+            .query(&ListCardsQuery { query, page, count })
+            .send()
+            .await?;
 
         Ok(request.json().await?)
     }

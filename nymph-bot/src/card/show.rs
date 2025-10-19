@@ -94,7 +94,7 @@ pub async fn show_card(cx: &InteractionContext, id: i32) -> anyhow::Result<Inter
     let guild_id = cx
         .guild_id
         .ok_or_else(|| Error::msg("missing guild id in interaction"))?;
-    let user = cx
+    let caller = cx
         .member
         .as_ref()
         .and_then(|m| m.user.as_ref())
@@ -102,7 +102,7 @@ pub async fn show_card(cx: &InteractionContext, id: i32) -> anyhow::Result<Inter
 
     let card = cx
         .db_client
-        .proxy_for(user.clone())
+        .proxy_for(&caller)
         .get_card(guild_id, id)
         .execute()
         .await?;

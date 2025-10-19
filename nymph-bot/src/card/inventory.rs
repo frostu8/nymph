@@ -69,6 +69,7 @@ pub async fn command_transfer_card(cx: InteractionContext, data: CommandData) ->
         if options.kind == InventoryTransferType::Grant {
             match cx
                 .db_client
+                .proxy_for(&caller)
                 .grant_card_to_user(user.id, card.id)
                 .execute()
                 .await
@@ -135,7 +136,74 @@ pub async fn command_transfer_card(cx: InteractionContext, data: CommandData) ->
                 Err(err) => Err(err),
             }
         } else {
-            todo!()
+            match cx
+                .db_client
+                .proxy_for(&caller)
+                .revoke_card_from_user(user.id, card.id)
+                .execute()
+                .await
+            {
+                Ok(card) => {
+                    // the operation was successful
+                    let message = format!(
+                        "Revoked card `{}` from user <@{}>!",
+                        card.name, options.target_user.id,
+                    );
+
+                    cx.client
+                        .interaction(cx.application_id)
+                        .create_response(
+                            cx.id,
+                            &cx.token,
+                            &InteractionResponse {
+                                kind: InteractionResponseType::ChannelMessageWithSource,
+                                data: Some(
+                                    InteractionResponseDataBuilder::new()
+                                        //.flags(MessageFlags::EPHEMERAL)
+                                        .content(message)
+                                        .allowed_mentions(AllowedMentions::default())
+                                        .build(),
+                                ),
+                            },
+                        )
+                        .await?;
+
+                    Ok(())
+                }
+                Err(err) if err.is::<ApiError>() => {
+                    match err.downcast_ref::<ApiError>().unwrap().code {
+                        ErrorCode::InvalidTransfer => {
+                            // user already owns the card!
+                            let message = format!(
+                                "User <@{}> does not own card `{}`!",
+                                options.target_user.id, card.name,
+                            );
+
+                            cx.client
+                                .interaction(cx.application_id)
+                                .create_response(
+                                    cx.id,
+                                    &cx.token,
+                                    &InteractionResponse {
+                                        kind: InteractionResponseType::ChannelMessageWithSource,
+                                        data: Some(
+                                            InteractionResponseDataBuilder::new()
+                                                .flags(MessageFlags::EPHEMERAL)
+                                                .content(message)
+                                                .allowed_mentions(AllowedMentions::default())
+                                                .build(),
+                                        ),
+                                    },
+                                )
+                                .await?;
+
+                            Ok(())
+                        }
+                        _ => Err(err),
+                    }
+                }
+                Err(err) => Err(err),
+            }
         }
     } else {
         let message = if is_current_user {

@@ -11,7 +11,7 @@ use derive_more::{Deref, Display, Error};
 
 use crate::config::ApiConfig;
 
-use crate::http::request::card::inventory::GrantCard;
+use crate::http::request::card::inventory::{GrantCard, RevokeCard};
 use crate::http::request::card::{GetCard, ListCards};
 
 use moka::future::Cache;
@@ -97,9 +97,9 @@ impl Client {
     /// Proxies as a user.
     ///
     /// Creates a copy of the client that can be used to proxy for a user.
-    pub fn proxy_for(&self, user: User) -> Client {
+    pub fn proxy_for(&self, user: &User) -> Client {
         Client {
-            proxy_for: Some(user),
+            proxy_for: Some(user.clone()),
             ..self.clone()
         }
     }
@@ -117,6 +117,11 @@ impl Client {
     /// Grants a card to a user.
     pub fn grant_card_to_user(&self, user_id: i32, card_id: i32) -> GrantCard {
         GrantCard::new(self.clone(), user_id, card_id)
+    }
+
+    /// Revokes a card from a user.
+    pub fn revoke_card_from_user(&self, user_id: i32, card_id: i32) -> RevokeCard {
+        RevokeCard::new(self.clone(), user_id, card_id)
     }
 
     /// Updates a Discord user's information.
@@ -177,7 +182,18 @@ impl Request {
         }
     }
 
-    /// Serrializes the body into the request.
+    /// Modify the query string of the URL with a serializable type.
+    pub fn query<T>(self, query: &T) -> Request
+    where
+        T: Serialize + ?Sized,
+    {
+        Request {
+            request: self.request.query(query),
+            ..self
+        }
+    }
+
+    /// Serializes the body into the request.
     pub fn json<T>(self, json: &T) -> Request
     where
         T: Serialize + ?Sized,
