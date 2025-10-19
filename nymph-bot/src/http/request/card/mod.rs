@@ -1,6 +1,6 @@
 //! Card-related queries and requests.
 
-use futures_util::future::BoxFuture;
+pub mod inventory;
 
 use http::Method;
 
@@ -42,6 +42,7 @@ impl ListCards {
         }
     }
 
+    /// Sets the page to explore.
     pub fn page(self, page: u32) -> ListCards {
         ListCards {
             page: Some(page),
@@ -49,6 +50,7 @@ impl ListCards {
         }
     }
 
+    /// Sets the count of entries to return.
     pub fn count(self, count: u32) -> ListCards {
         ListCards {
             count: Some(count),
@@ -64,29 +66,27 @@ impl ListCards {
             ..self
         }
     }
-}
 
-impl IntoFuture for ListCards {
-    type Output = Result<Vec<Card>, Error>;
-    type IntoFuture = BoxFuture<'static, Self::Output>;
+    /// Sends the request.
+    pub async fn execute(self) -> Result<Vec<Card>, Error> {
+        let ListCards {
+            client,
+            guild_id,
+            query,
+            page,
+            count,
+        } = self;
 
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            let query = serde_urlencoded::ser::to_string(&ListCardsQuery {
-                query: self.query,
-                page: self.page,
-                count: self.count,
-            })?;
+        let query = serde_urlencoded::ser::to_string(&ListCardsQuery { query, page, count })?;
 
-            let mut url = format!("/guilds/{}/cards", self.guild_id);
-            if query.len() > 0 {
-                url = format!("{}?{}", url, query);
-            }
+        let mut url = format!("/guilds/{}/cards", guild_id);
+        if query.len() > 0 {
+            url = format!("{}?{}", url, query);
+        }
 
-            let request = self.client.request(Method::GET, url).send().await?;
+        let request = client.request(Method::GET, url).send().await?;
 
-            Ok(request.json().await?)
-        })
+        Ok(request.json().await?)
     }
 }
 
@@ -106,24 +106,20 @@ impl GetCard {
             id,
         }
     }
-}
 
-impl IntoFuture for GetCard {
-    type Output = Result<Card, Error>;
-    type IntoFuture = BoxFuture<'static, Self::Output>;
+    /// Sends the request.
+    pub async fn execute(self) -> Result<Card, Error> {
+        let GetCard {
+            client,
+            guild_id,
+            id,
+        } = self;
 
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            let request = self
-                .client
-                .request(
-                    Method::GET,
-                    format!("/guilds/{}/cards/{}", self.guild_id, self.id),
-                )
-                .send()
-                .await?;
+        let request = client
+            .request(Method::GET, format!("/guilds/{}/cards/{}", guild_id, id))
+            .send()
+            .await?;
 
-            Ok(request.json().await?)
-        })
+        Ok(request.json().await?)
     }
 }

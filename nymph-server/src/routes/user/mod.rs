@@ -11,25 +11,24 @@ use chrono::{DateTime, TimeDelta, Utc};
 
 use sqlx::{Acquire as _, FromRow};
 
-use nymph_model::{request::user::UserProxyRequest, response::user::UserProxyResponse};
+use nymph_model::{
+    request::user::UpdateDiscordUserRequest, response::user::UpdateDiscordUserResponse, user::User,
+};
 
-/// Updates user information, returning an access token so the bot can proxy.
-///
-/// **This is a secured endpoint.** Clients must use mTLS to access this
-/// endpoint.
+/// Updates user information from discord.
 #[debug_handler]
-pub async fn proxy_for(
+pub async fn discord(
     State(state): State<AppState>,
     auth: Authentication,
-    AppJson(request): AppJson<UserProxyRequest>,
-) -> Result<AppJson<UserProxyResponse>, AppError> {
+    AppJson(request): AppJson<UpdateDiscordUserRequest>,
+) -> Result<AppJson<UpdateDiscordUserResponse>, AppError> {
     if !auth.managed {
         return Err(AppErrorKind::Forbidden.into());
     }
 
     #[derive(Debug, FromRow)]
     #[allow(dead_code)]
-    struct User {
+    struct UserQuery {
         id: i32,
         display_name: String,
         managed: bool,
@@ -41,7 +40,7 @@ pub async fn proxy_for(
 
     let now = Utc::now();
 
-    let user = sqlx::query_as::<_, User>(
+    let user = sqlx::query_as::<_, UserQuery>(
         r#"
         SELECT u.id, u.display_name, u.managed, u.inserted_at, u.updated_at
         FROM user u, discord_auth da
@@ -83,7 +82,7 @@ pub async fn proxy_for(
         None => {
             let mut tx = conn.begin().await?;
 
-            let user = sqlx::query_as::<_, User>(
+            let user = sqlx::query_as::<_, UserQuery>(
                 r#"
                 INSERT INTO user (display_name, inserted_at, updated_at)
                 VALUES ($1, $2, $2)
@@ -116,9 +115,22 @@ pub async fn proxy_for(
         }
     };
 
-    // create claims
-    let claims = Claims::builder(user.id).exp(TimeDelta::minutes(15)).build();
-    let token = claims.encode(&state.keys)?;
+    let user = User {
+        id: user.id,
+        display_name: user.display_name.clone(),
+    };
 
-    Ok(AppJson(UserProxyResponse { token }))
+    // create claims
+    let access_token = if request.generate_token {
+        let claims = Claims::builder(user.id).exp(TimeDelta::minutes(15)).build();
+        Some(claims.encode(&state.keys)?)
+    } else {
+        None
+    };
+
+    Ok(AppJson(UpdateDiscordUserResponse {
+        user,
+        discord_id: request.discord_id,
+        access_token,
+    }))
 }

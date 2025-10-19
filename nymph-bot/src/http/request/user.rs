@@ -2,11 +2,11 @@
 
 use std::num::NonZeroU64;
 
-use futures_util::future::BoxFuture;
-
 use http::Method;
 
-use nymph_model::{request::user::UserProxyRequest, response::user::UserProxyResponse};
+use nymph_model::{
+    request::user::UpdateDiscordUserRequest, response::user::UpdateDiscordUserResponse,
+};
 
 use twilight_model::id::{Id, marker::UserMarker};
 
@@ -16,40 +16,55 @@ use anyhow::Error;
 
 /// Proxies for a Discord user using the bot.
 #[derive(Debug)]
-pub struct UserProxy {
+pub struct UpdateDiscordUser {
     client: Client,
     discord_id: Id<UserMarker>,
     display_name: String,
+    generate_token: bool,
 }
 
-impl UserProxy {
-    /// Creates a new `UserProxy`.
-    pub fn new(client: Client, discord_id: Id<UserMarker>, display_name: String) -> UserProxy {
-        UserProxy {
+impl UpdateDiscordUser {
+    /// Creates a new `UpdateDiscordUser`.
+    pub fn new(client: Client, discord_id: Id<UserMarker>, display_name: String) -> Self {
+        UpdateDiscordUser {
             client,
             discord_id,
             display_name,
+            generate_token: false,
         }
     }
-}
 
-impl IntoFuture for UserProxy {
-    type Output = Result<UserProxyResponse, Error>;
-    type IntoFuture = BoxFuture<'static, Self::Output>;
+    /// Generates a token.
+    pub fn generate_token(self, generate_token: bool) -> Self {
+        UpdateDiscordUser {
+            generate_token,
+            ..self
+        }
+    }
 
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            let request = self
-                .client
-                .request(Method::POST, "/users/proxy")
-                .json(&UserProxyRequest {
-                    discord_id: NonZeroU64::from(self.discord_id).into(),
-                    display_name: self.display_name,
-                })
-                .send()
-                .await?;
+    /// Sends the request.
+    pub async fn execute(self) -> Result<UpdateDiscordUserResponse, Error> {
+        let UpdateDiscordUser {
+            client,
+            discord_id,
+            display_name,
+            generate_token,
+        } = self;
 
-            Ok(request.json().await?)
-        })
+        let request = client
+            .request(Method::POST, "/users/discord")
+            .json(&UpdateDiscordUserRequest {
+                discord_id: NonZeroU64::from(discord_id).into(),
+                display_name: display_name,
+                generate_token: generate_token,
+            })
+            .send_privileged()
+            .await?;
+
+        // get response and cache
+        let res = request.json::<UpdateDiscordUserResponse>().await?;
+        client.update_cache(&res).await;
+
+        Ok(res)
     }
 }

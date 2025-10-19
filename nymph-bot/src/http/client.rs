@@ -1,23 +1,26 @@
 //! Nymph API client.
 
-use super::request::user::UserProxy;
+use super::request::user::UpdateDiscordUser;
 
 use anyhow::Error;
 
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use derive_more::{Display, Error};
+use derive_more::{Deref, Display, Error};
 
 use crate::config::ApiConfig;
 
+use crate::http::request::card::inventory::GrantCard;
 use crate::http::request::card::{GetCard, ListCards};
 
-use dashmap::DashMap;
+use moka::future::Cache;
 
 use http::{HeaderName, HeaderValue, Method, header};
 
-use nymph_model::ErrorCode;
-use nymph_model::{Error as ApiError, response::user::UserProxyResponse};
+use nymph_model::{
+    Error as ApiError, ErrorCode, response::user::UpdateDiscordUserResponse, user::User as DbUser,
+};
 
 use serde::Serialize;
 use twilight_model::id::marker::GuildMarker;
@@ -30,11 +33,11 @@ use twilight_model::{
 ///
 /// Cheaply cloneable, as it uses an `Arc` to track internal state and manage
 /// connections.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
     http: reqwest::Client,
     state: Arc<ClientState>,
-    token_refresh_retries: u32,
+    user_cache: Cache<Id<UserMarker>, CachedUser>,
     proxy_for: Option<User>,
 }
 
@@ -42,7 +45,17 @@ pub struct Client {
 struct ClientState {
     endpoint: String,
     api_key: String,
-    token_store: DashMap<Id<UserMarker>, String>,
+    token_refresh_retries: u32,
+}
+
+/// A cached user.
+#[derive(Clone, Debug, Deref, PartialEq, Eq, Hash)]
+pub struct CachedUser {
+    /// The user.
+    #[deref]
+    pub user: DbUser,
+    /// The access token of the user.
+    pub access_token: Option<String>,
 }
 
 impl Client {
@@ -56,15 +69,29 @@ impl Client {
         let state = ClientState {
             endpoint: config.endpoint.to_owned(),
             api_key: config.key.to_owned(),
-            token_store: DashMap::new(),
+            token_refresh_retries: config.token_refresh_retries,
         };
 
         Ok(Client {
             http,
             state: Arc::new(state),
+            user_cache: Cache::new(10_000),
             proxy_for: None,
-            token_refresh_retries: config.token_refresh_retries,
         })
+    }
+
+    /// Gets a user, trying first from the cache, and then submitting a request
+    /// to get them from the API.
+    pub async fn get_discord_user(&self, user: &User) -> Result<DbUser, Error> {
+        if let Some(user) = self.user_cache.get(&user.id).await {
+            Ok(user.user.clone())
+        } else {
+            self.update_discord_user(user.id, &user.name)
+                .execute()
+                .await
+                .map(|res| res.user.clone())
+                .map_err(From::from)
+        }
     }
 
     /// Proxies as a user.
@@ -87,32 +114,45 @@ impl Client {
         ListCards::new(self.clone(), guild_id)
     }
 
+    /// Grants a card to a user.
+    pub fn grant_card_to_user(&self, user_id: i32, card_id: i32) -> GrantCard {
+        GrantCard::new(self.clone(), user_id, card_id)
+    }
+
+    /// Updates a Discord user's information.
+    pub fn update_discord_user(
+        &self,
+        discord_id: Id<UserMarker>,
+        display_name: impl Into<String>,
+    ) -> UpdateDiscordUser {
+        UpdateDiscordUser::new(self.clone(), discord_id, display_name.into())
+    }
+
+    /// Makes a generic request to the server.
     pub(super) fn request(&self, method: Method, url: impl AsRef<str>) -> Request {
         Request::new(self.clone(), method, url)
     }
 
-    /// Creates a proxy for a discord user.
-    pub(super) fn create_proxy(
-        &self,
-        discord_id: Id<UserMarker>,
-        display_name: impl Into<String>,
-    ) -> UserProxy {
-        UserProxy::new(self.clone(), discord_id, display_name.into())
-    }
+    /// Updates the user cache with a result from the `/users/discord`
+    /// endpoint.
+    pub(super) async fn update_cache(&self, res: &UpdateDiscordUserResponse) {
+        let discord_id = Id::<UserMarker>::from(NonZeroU64::from(res.discord_id));
+        let cached_user = self.user_cache.get(&discord_id).await;
 
-    /// Sets up a proxy to be used in requests for a Discord user.
-    ///
-    /// Returns the resulting string if the proxy was successful.
-    pub(super) async fn cache_proxy(&self, user: &User) -> Result<String, Error> {
-        let display_name = user.name.to_string();
+        let access_token = res
+            .access_token
+            .to_owned()
+            .or(cached_user.and_then(|user| user.access_token));
 
-        let UserProxyResponse { token, .. } = self.create_proxy(user.id, display_name).await?;
-
-        // cache token for later
-        // make sure this is a String so SecUtf8 can take ownership of the buf
-        self.state.token_store.insert(user.id, token.clone());
-
-        Ok(token)
+        self.user_cache
+            .insert(
+                discord_id,
+                CachedUser {
+                    user: res.user.clone(),
+                    access_token,
+                },
+            )
+            .await;
     }
 }
 
@@ -148,22 +188,53 @@ impl Request {
         }
     }
 
+    /// Makes a general request to the API as the bot.
+    ///
+    /// This bypasses any possible proxying.
+    pub async fn send_privileged(self) -> Result<reqwest::Response, Error> {
+        let mut request = self.request.build()?;
+
+        request.headers_mut().insert(
+            HeaderName::from_static("x-api-key"),
+            HeaderValue::from_str(&self.client.state.api_key).expect("valid api key"),
+        );
+
+        let res = self.client.http.execute(request).await?;
+
+        if res.status().is_success() {
+            Ok(res)
+        } else {
+            Err(res.json::<ApiError>().await?.into())
+        }
+    }
+
     /// Makes a general request to the API.
     pub async fn send(mut self) -> Result<reqwest::Response, Error> {
-        let mut request = self.request.build()?;
-        let use_proxy = !request.headers().contains_key(header::AUTHORIZATION);
+        let token_refresh_retries = self.client.state.token_refresh_retries;
 
-        if use_proxy && self.client.proxy_for.is_some() {
+        if self.client.proxy_for.is_some() {
+            let mut request = self.request.build()?;
             let user = self.client.proxy_for.take().unwrap();
 
-            // TODO: magic number
-            for _ in 0..self.client.token_refresh_retries {
+            for _ in 0..token_refresh_retries {
                 // try to get bearer token
-                let token = if let Some(token) = self.client.state.token_store.get(&user.id) {
-                    token.clone()
+                let token = if let Some(token) = self
+                    .client
+                    .user_cache
+                    .get(&user.id)
+                    .await
+                    .and_then(|user| user.access_token)
+                {
+                    token
                 } else {
                     // fetch bearer token from internet
-                    self.client.cache_proxy(&user).await?
+                    self.client
+                        .update_discord_user(user.id, user.name.clone())
+                        .generate_token(true)
+                        .execute()
+                        .await?
+                        .access_token
+                        .ok_or_else(|| Error::msg("server refused to give access token"))?
                 };
 
                 request.headers_mut().insert(
@@ -186,7 +257,7 @@ impl Request {
 
                     if error.code == ErrorCode::BadCredentials {
                         // retry request after getting new credentials
-                        self.client.state.token_store.remove(&user.id);
+                        self.client.user_cache.invalidate(&user.id).await;
                     } else {
                         return Err(error.into());
                     }
@@ -195,21 +266,18 @@ impl Request {
 
             Err(TokenRefreshError.into())
         } else {
-            request.headers_mut().insert(
-                HeaderName::from_static("x-api-key"),
-                HeaderValue::from_str(&self.client.state.api_key).expect("valid api key"),
-            );
-
-            let res = self.client.http.execute(request).await?;
-
-            if res.status().is_success() {
-                Ok(res)
-            } else {
-                Err(res.json::<ApiError>().await?.into())
-            }
+            self.send_privileged().await
         }
     }
 }
+
+/// A marker type for a client requesting as the bot.
+#[derive(Debug)]
+pub struct Bot;
+
+/// A marker type for a client requesting as a proxy.
+#[derive(Debug)]
+pub struct Proxy;
 
 /// The token failed to refresh.
 #[derive(Debug, Display, Error)]

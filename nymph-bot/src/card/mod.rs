@@ -1,8 +1,10 @@
 //! Card functions and instrumentation.
 
 mod editor;
+mod inventory;
 mod show;
 
+pub use inventory::command_transfer_card;
 pub use show::command_show;
 
 use std::fmt::Debug;
@@ -66,6 +68,7 @@ pub async fn autocomplete(cx: &InteractionContext, data: CommandData) -> anyhow:
         .proxy_for(user.clone())
         .list_cards(guild_id)
         .search(name)
+        .execute()
         .await?
         .into_iter()
         .filter(|card| !card.hidden.unwrap_or(false))

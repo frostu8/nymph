@@ -273,19 +273,10 @@ pub async fn get_card(state: &AppState, id: i32, auth: &Authentication) -> Resul
     .fetch_optional(&state.db)
     .await?;
 
-    if let Some(card) = card {
-        match card.visibility.into() {
-            Visibility::Hidden if !card.owned => return Err(AppErrorKind::Hidden(card.name).into()),
-            Visibility::Private if !card.owned => return Err(AppErrorKind::Forbidden.into()),
-            // Public cards are always viewable
-            _ => (),
-        }
-
-        let card = preload_card(state, auth, Card::from(card)).await?;
-        Ok(card)
-    } else {
-        Err(AppError::from(AppErrorKind::NotFound)
-            .with_message(format!("The card of id {} does not exist.", id)))
+    match card {
+        Some(card) => Ok(preload_card(state, auth, Card::from(card)).await?),
+        None => Err(AppError::from(AppErrorKind::NotFound)
+            .with_message(format!("The card of id {} does not exist.", id))),
     }
 }
 

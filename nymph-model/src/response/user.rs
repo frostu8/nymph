@@ -2,12 +2,20 @@
 
 use serde::{Deserialize, Serialize};
 
-/// A response from `POST /users/{user.id}`. This endpoint (secured by mTLS)
-/// allows the Discord bot to query as another user.
+use crate::{Id, user::User};
+
+/// A response from `POST /users/discord`. This endpoint allows the Discord bot
+/// to update a discord user's details without querying for their id and such
+/// beforehand, and also allows the bot to pose as them in requests.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct UserProxyResponse {
+pub struct UpdateDiscordUserResponse {
+    /// The user.
+    pub user: User,
+    /// The discord ID of the updated user.
+    pub discord_id: Id,
     /// A signed JWT that allows the bot to proxy as a user.
     ///
-    /// These typically have very short lifetimes (15 mins).
-    pub token: String,
+    /// Only returned if `generate_token` was raised in the request. These
+    /// typically have very short lifetimes (15 mins).
+    pub access_token: Option<String>,
 }

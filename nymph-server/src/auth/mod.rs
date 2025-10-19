@@ -45,20 +45,17 @@ where
     type Rejection = AppError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let api_key = parts
-            .extract_with_state::<ApiKeyAuthentication, S>(state)
+        let token = parts
+            .extract_with_state::<TokenAuthentication, S>(state)
             .await
-            .map(|api_key| Authentication(api_key.user.clone()));
+            .map(|token| Authentication(token.user.clone()));
 
-        match api_key {
-            Ok(api_key) => Ok(api_key),
-            Err(err) if matches!(err.kind(), AppErrorKind::Unauthenticated) => {
-                // try token auth
-                parts
-                    .extract_with_state::<TokenAuthentication, S>(state)
-                    .await
-                    .map(|token| Authentication(token.user.clone()))
-            }
+        match token {
+            Ok(token) => Ok(token),
+            Err(err) if matches!(err.kind(), AppErrorKind::Unauthenticated) => parts
+                .extract_with_state::<ApiKeyAuthentication, S>(state)
+                .await
+                .map(|api_key| Authentication(api_key.user.clone())),
             Err(err) => Err(err),
         }
     }

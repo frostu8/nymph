@@ -34,5 +34,5 @@ http = "1"
 futures-util = "0.3"
 textdistance = "1"
 reqwest = "0.12"
-dashmap = "6"
+moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10"

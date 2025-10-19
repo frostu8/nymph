@@ -41,6 +41,7 @@ pub async fn command_show(cx: InteractionContext, data: CommandData) -> anyhow::
         .db_client
         .list_cards(guild_id)
         .find(&name)
+        .execute()
         .await?
         .into_iter()
         // only find exact matches
@@ -69,20 +70,17 @@ pub async fn command_show(cx: InteractionContext, data: CommandData) -> anyhow::
             .await
             .map(|_| ())
             .map_err(From::from),
-        Err(err) if err.is::<ApiError>() => {
-            // check if it's an api error
-            match err.downcast_ref::<ApiError>().unwrap().code {
-                ErrorCode::Hidden => {
-                    tracing::debug!(?err, "/s: card is hidden");
-                    show_unauthorized(&cx, &name).await.map_err(From::from)
-                }
-                ErrorCode::Forbidden => {
-                    tracing::debug!(?err, "/s: card is private");
-                    show_not_found(&cx, &name).await.map_err(From::from)
-                }
-                _ => Err(err),
+        Err(err) if err.is::<ApiError>() => match err.downcast_ref::<ApiError>().unwrap().code {
+            ErrorCode::Hidden => {
+                tracing::debug!(?err, "/s: card is hidden");
+                show_unauthorized(&cx, &name).await.map_err(From::from)
             }
-        }
+            ErrorCode::Forbidden => {
+                tracing::debug!(?err, "/s: card is private");
+                show_not_found(&cx, &name).await.map_err(From::from)
+            }
+            _ => Err(err),
+        },
         Err(err) => Err(err),
     }
 }
@@ -106,6 +104,7 @@ pub async fn show_card(cx: &InteractionContext, id: i32) -> anyhow::Result<Inter
         .db_client
         .proxy_for(user.clone())
         .get_card(guild_id, id)
+        .execute()
         .await?;
 
     tracing::debug!(?card, "/s: got card");

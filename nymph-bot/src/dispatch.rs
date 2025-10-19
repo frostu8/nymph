@@ -24,7 +24,9 @@ pub async fn interaction(mut cx: InteractionContext) {
             };
 
             if let Err(err) = slash_command(cx, *data).await {
-                tracing::error!("{:?}", err);
+                for err in err.chain() {
+                    tracing::error!("{:?}", err);
+                }
             }
         }
         InteractionType::ApplicationCommandAutocomplete => {
@@ -35,7 +37,9 @@ pub async fn interaction(mut cx: InteractionContext) {
             };
 
             if let Err(err) = autocomplete(cx, *data).await {
-                tracing::error!("{:?}", err);
+                for err in err.chain() {
+                    tracing::error!("{:?}", err);
+                }
             }
         }
         /*
@@ -59,6 +63,7 @@ pub async fn interaction(mut cx: InteractionContext) {
 async fn slash_command(cx: InteractionContext, data: CommandData) -> anyhow::Result<()> {
     match data.name.as_str() {
         "s" => crate::card::command_show(cx, data).await?,
+        "grant" | "revoke" => crate::card::command_transfer_card(cx, data).await?,
         /*
                 "sl" => {
                     let name = data
@@ -104,11 +109,11 @@ async fn slash_command(cx: InteractionContext, data: CommandData) -> anyhow::Res
                 cx.client
                     .interaction(cx.application_id)
                     .create_response(
-                        interaction.id,
+                        interaction.id,dca06d299e4eb237905ba3f49b5d6012f41819581caea529bd4435cc4b4cf6d6898c2c2e82a667abca515822db9d7aff749b65f35a7d80756baed0418c31e375dec4627dd70f627d7e587be38bd076c511fd40581878c28b75e96a79b7442c1d95293d31e506f318299c5170844dc99c2fc774db1e80fe943db0200758a180921242b5a7f362b5de2ff0654d926956232c3699fac91e0b31ef883d0aa547166d5a292c8f2baddb9387f35950d625ec0dea109356c21f07754ee2d76d61ccfc1d74a6871efaf112589c1bfdd01dfb85912d8bc623ec21958b7a8a6e23b248f48783e68cb51a4e78c85607fe8cd8f21519c5f135a48944c40a0a010aab5b115c1e
                         &interaction.token,
                         &InteractionResponse {
                             kind: InteractionResponseType::ChannelMessageWithSource,
-                            data: Some(
+                            data: Some(13  6367
                                 InteractionResponseDataBuilder::new()
                                     .flags(MessageFlags::EPHEMERAL)
                                     .content(message)
@@ -149,11 +154,6 @@ async fn slash_command(cx: InteractionContext, data: CommandData) -> anyhow::Res
                         format!("-# {}", cx.config.accent.self_grant)
                     }
                     GrantTargetError::IsBot => {
-.into_iter().map(|name| CommandOptionChoice {
-                name_localizations: None,
-                value: CommandOptionChoiceValue::String(name.clone()),
-                name,
-            });
                         format!(
                             "User <@{}> is a bot. Unfortunately, automatons do not have the higher thought required to appreciate game design.",
                             target_user_id

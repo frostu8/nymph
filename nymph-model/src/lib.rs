@@ -12,13 +12,14 @@ use derive_more::{Deref, DerefMut, Error, From, Into};
 pub mod card;
 pub mod request;
 pub mod response;
+pub mod user;
 
 /// A container used to serialize and deserialize large ids.
 ///
 /// Because Discord snowflakes approach sizes of integer not representable by
 /// Javascript's usual JSON parsing utilities, they are encoded as string
 /// atoms.
-#[derive(Clone, Copy, Debug, From, Into, Deref, DerefMut, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, From, Into, Deref, DerefMut, PartialEq, Eq, Hash)]
 pub struct Id(NonZeroU64);
 
 impl Id {
@@ -84,9 +85,7 @@ pub enum ErrorCode {
     /// The card is hidden to the user.
     Hidden,
     /// The card is already owned by the user.
-    AlreadyOwned,
-    /// The card is not owned by the user.
-    Unowned,
+    InvalidTransfer,
     /// The user is unauthorized.
     Unauthenticated,
     /// The user's credentials have expired or are otherwise bad.
@@ -112,8 +111,7 @@ impl From<u32> for ErrorCode {
             4005 => ErrorCode::Forbidden,
             4006 => ErrorCode::Hidden,
             4007 => ErrorCode::InsufficientPermissions,
-            4008 => ErrorCode::AlreadyOwned,
-            4009 => ErrorCode::Unowned,
+            4008 => ErrorCode::InvalidTransfer,
             4010 => ErrorCode::BadCredentials,
             5000 => ErrorCode::InternalServerError,
             other => ErrorCode::Other(other),
@@ -132,8 +130,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::Forbidden => 4005,
             ErrorCode::Hidden => 4006,
             ErrorCode::InsufficientPermissions => 4007,
-            ErrorCode::AlreadyOwned => 4008,
-            ErrorCode::Unowned => 4009,
+            ErrorCode::InvalidTransfer => 4008,
             ErrorCode::BadCredentials => 4010,
             ErrorCode::InternalServerError => 5000,
             ErrorCode::Other(other) => other,

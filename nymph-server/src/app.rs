@@ -379,8 +379,8 @@ impl IntoResponse for AppError {
             AppErrorKind::InvalidTransfer(name) => (
                 StatusCode::BAD_REQUEST,
                 ApiError {
-                    code: ErrorCode::AlreadyOwned,
-                    message: format!("Card `{}` cannot be transferred.", name),
+                    code: ErrorCode::InvalidTransfer,
+                    message: format!("Ownership of card `{}` cannot be transferred.", name),
                 },
                 None,
             ),

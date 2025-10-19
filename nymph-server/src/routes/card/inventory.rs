@@ -117,10 +117,7 @@ pub async fn revoke(
 ) -> Result<AppJson<Card>, AppError> {
     // TODO: finer grained permissions
 
-    update_ownership(&state.db, user_id, card_id, false).await?;
-
-    // fetch card
-    let res = update_ownership(&state.db, user_id, card_id, true).await?;
+    let res = update_ownership(&state.db, user_id, card_id, false).await?;
     let card = get_card(&state, card_id, &auth).await?;
 
     if res.rows_affected() > 0 {

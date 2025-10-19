@@ -10,6 +10,7 @@ use axum::{
     routing::{delete, get, post},
 };
 
+use axum_server::Handle;
 use clap::Parser as _;
 
 use nymph_server::{
@@ -70,7 +71,7 @@ async fn main() -> Result<(), Error> {
         .nest(
             "/users",
             Router::<AppState>::new()
-                .route("/proxy", post(routes::user::proxy_for))
+                .route("/discord", post(routes::user::discord))
                 .nest(
                     "/{user_id}",
                     Router::<AppState>::new()
@@ -102,12 +103,18 @@ async fn main() -> Result<(), Error> {
         .layer(CompressionLayer::new())
         .with_state(state);
 
+    // Setup cancellation task for server
+    let handle = Handle::new();
+
+    // Start cancellation task
+    tokio::spawn(shutdown_signal(handle.clone()));
+
     // Serve HTTP
     tracing::info!("listening on {} (http)", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, router.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
+    axum_server::bind(addr)
+        .handle(handle)
+        .serve(router.into_make_service())
         .await?;
 
     // Close Sql connection
@@ -131,7 +138,7 @@ async fn log_app_errors(request: Request, next: Next) -> Response {
 
 // Stolen from: https://github.com/maxcountryman/tower-sessions-stores/tree/main/sqlx-store
 // Lol
-async fn shutdown_signal() {
+async fn shutdown_signal(handle: Handle) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -150,7 +157,7 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     select! {
-        _ = ctrl_c => { },
-        _ = terminate => { },
+        _ = ctrl_c => { handle.shutdown() }
+        _ = terminate => { handle.shutdown() }
     }
 }
