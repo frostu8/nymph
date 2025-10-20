@@ -4,7 +4,7 @@
 
 use std::iter;
 
-use nymph_model::{Error as ApiError, ErrorCode, card::Card};
+use nymph_model::{ApiError, ErrorCode, card::Card};
 
 use twilight_util::builder::InteractionResponseDataBuilder;
 

@@ -19,7 +19,7 @@ use moka::future::Cache;
 use http::{HeaderName, HeaderValue, Method, header};
 
 use nymph_model::{
-    Error as ApiError, ErrorCode, response::user::UpdateDiscordUserResponse, user::User as DbUser,
+    ApiError, ErrorCode, response::user::UpdateDiscordUserResponse, user::User as DbUser,
 };
 
 use serde::Serialize;

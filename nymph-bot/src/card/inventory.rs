@@ -2,7 +2,7 @@
 
 use anyhow::{Context as _, Error};
 
-use nymph_model::{Error as ApiError, ErrorCode};
+use nymph_model::{ApiError, ErrorCode};
 
 use twilight_model::{
     application::interaction::application_command::{CommandData, CommandOptionValue},
